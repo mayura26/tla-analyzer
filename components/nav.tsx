@@ -7,13 +7,17 @@ import { ThemeToggle } from "@/components/theme-toggle";
 
 const navItems = [
   {
-    title: "Input Data",
-    href: "/input",
+    title: "Raw Data",
+    href: "/input"
   },
   {
-    title: "Compare",
-    href: "/compare",
+    title: "Compare Data",
+    href: "/compare"
   },
+  {
+    title: "View Comparison",
+    href: "/compare/view"
+  }
 ];
 
 export function Nav() {
@@ -28,7 +32,7 @@ export function Nav() {
               TLA Analyzer
             </Link>
           </div>
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center gap-6">
             {navItems.map((item) => (
               <Link
                 key={item.href}
