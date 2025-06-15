@@ -64,38 +64,47 @@ interface TradingData {
 }
 
 export interface DailyLog {
-  date: string; // e.g., '2025-03-10'
+  date: string;
   analysis: TradingLogAnalysis;
 }
 
 export interface WeekLog {
-  weekStart: string; // Monday
-  weekEnd: string;   // Sunday
+  weekStart: string;
+  weekEnd: string;
   days: DailyLog[];
-  weekHeadline: any; // summary for the week (can be refined)
+  weekHeadline: any;
 }
+
+type DataEndpoint = 'daily' | 'compare';
 
 class TradingDataStore {
   private static instance: TradingDataStore;
-  private allDays: DailyLog[] = [];
-  private compareData: TradingData | null = null;
   private readonly dataDir: string;
-  private readonly allDaysPath: string;
-  private readonly compareDataPath: string;
+  private readonly endpoints: Record<DataEndpoint, {
+    path: string;
+    storageKey: string;
+    data: DailyLog[];
+  }>;
 
   private constructor() {
-    // In a Next.js app, we need to handle both server and client environments
     if (typeof window === 'undefined') {
-      // Server-side
       this.dataDir = path.join(process.cwd(), 'data');
-      this.allDaysPath = path.join(this.dataDir, 'all-days.json');
-      this.compareDataPath = path.join(this.dataDir, 'compare-data.json');
     } else {
-      // Client-side
       this.dataDir = '/data';
-      this.allDaysPath = '/data/all-days.json';
-      this.compareDataPath = '/data/compare-data.json';
     }
+
+    this.endpoints = {
+      daily: {
+        path: typeof window === 'undefined' ? path.join(this.dataDir, 'all-days.json') : '/data/all-days.json',
+        storageKey: 'trading_all_days',
+        data: []
+      },
+      compare: {
+        path: typeof window === 'undefined' ? path.join(this.dataDir, 'compare-data.json') : '/data/compare-data.json',
+        storageKey: 'trading_compare_days',
+        data: []
+      }
+    };
   }
 
   static getInstance(): TradingDataStore {
@@ -115,86 +124,173 @@ class TradingDataStore {
     }
   }
 
-  private async loadFromStorage() {
+  private async loadFromStorage(endpoint: DataEndpoint) {
+    const endpointData = this.endpoints[endpoint];
     if (typeof window === 'undefined') {
       try {
         await this.ensureDataDirectory();
-        const data = await fs.readFile(this.allDaysPath, 'utf-8');
-        this.allDays = JSON.parse(data);
+        const data = await fs.readFile(endpointData.path, 'utf-8');
+        endpointData.data = JSON.parse(data) || [];
       } catch (error) {
-        console.error('Error loading all days:', error);
-        this.allDays = [];
+        console.error(`Error loading ${endpoint} data:`, error);
+        endpointData.data = [];
       }
     } else {
-      // Client-side: Use localStorage as fallback
-      const allDaysStr = localStorage.getItem('trading_all_days');
-      if (allDaysStr) {
-        this.allDays = JSON.parse(allDaysStr);
-      }
+      const storedData = localStorage.getItem(endpointData.storageKey);
+      endpointData.data = storedData ? JSON.parse(storedData) : [];
     }
   }
 
-  private async saveToStorage() {
-    if (!this.allDays) return;
+  private async saveToStorage(endpoint: DataEndpoint) {
+    const endpointData = this.endpoints[endpoint];
+    if (!Array.isArray(endpointData.data)) {
+      endpointData.data = [];
+    }
 
     if (typeof window === 'undefined') {
       try {
         await this.ensureDataDirectory();
         await fs.writeFile(
-          this.allDaysPath,
-          JSON.stringify(this.allDays, null, 2),
+          endpointData.path,
+          JSON.stringify(endpointData.data, null, 2),
           'utf-8'
         );
       } catch (error) {
-        console.error('Error saving all days:', error);
+        console.error(`Error saving ${endpoint} data:`, error);
       }
     } else {
-      // Client-side: Use localStorage as fallback
-      localStorage.setItem('trading_all_days', JSON.stringify(this.allDays));
+      localStorage.setItem(endpointData.storageKey, JSON.stringify(endpointData.data));
     }
   }
 
+  async addLog(endpoint: DataEndpoint, day: DailyLog) {
+    await this.loadFromStorage(endpoint);
+    const endpointData = this.endpoints[endpoint];
+    if (!Array.isArray(endpointData.data)) {
+      endpointData.data = [];
+    }
+    endpointData.data = endpointData.data.filter(d => d.date !== day.date);
+    endpointData.data.push(day);
+    endpointData.data.sort((a, b) => b.date.localeCompare(a.date));
+    await this.saveToStorage(endpoint);
+  }
+
+  async getLogs(endpoint: DataEndpoint): Promise<DailyLog[]> {
+    await this.loadFromStorage(endpoint);
+    return this.endpoints[endpoint].data;
+  }
+
+  async getLatestLog(endpoint: DataEndpoint): Promise<TradingData | null> {
+    await this.loadFromStorage(endpoint);
+    const logs = this.endpoints[endpoint].data;
+    if (!logs.length) return null;
+
+    const latestDay = logs[0];
+    return {
+      date: latestDay.date,
+      analysis: {
+        headline: {
+          totalPnl: latestDay.analysis.headline.totalPnl,
+          totalTrades: latestDay.analysis.headline.totalTrades,
+          wins: latestDay.analysis.headline.wins,
+          losses: latestDay.analysis.headline.losses,
+          bigWins: latestDay.analysis.headline.bigWins || 0,
+          bigLosses: latestDay.analysis.headline.bigLosses || 0,
+          trailingDrawdown: latestDay.analysis.headline.trailingDrawdown || 0,
+          contracts: latestDay.analysis.headline.contracts || 0,
+          maxPotentialGainPerContract: latestDay.analysis.headline.maxPotentialGainPerContract || 0,
+          pnlPerTrade: latestDay.analysis.headline.pnlPerTrade || 0,
+          maxProfit: latestDay.analysis.headline.maxProfit || 0,
+          maxRisk: latestDay.analysis.headline.maxRisk || 0,
+          maxDailyGain: latestDay.analysis.headline.maxDailyGain || 0,
+          maxDailyLoss: latestDay.analysis.headline.maxDailyLoss || 0
+        },
+        sessions: {
+          morning: latestDay.analysis.sessions.morning || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
+          main: latestDay.analysis.sessions.main || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
+          midday: latestDay.analysis.sessions.midday || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
+          afternoon: latestDay.analysis.sessions.afternoon || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
+          end: latestDay.analysis.sessions.end || { pnl: 0, trades: 0, avgPnlPerTrade: 0 }
+        },
+        protectionStats: latestDay.analysis.protectionStats,
+        tradeList: latestDay.analysis.tradeList,
+        tradeBreakdown: {
+          ordersGenerated: latestDay.analysis.tradeBreakdown.ordersGenerated || 0,
+          ordersFilled: latestDay.analysis.tradeBreakdown.ordersFilled || 0,
+          fillRate: latestDay.analysis.tradeBreakdown.fillRate || 0,
+          chaseModeTradesPnl: latestDay.analysis.tradeBreakdown.chaseModeTradesPnl || 0,
+          chaseModeTrades: latestDay.analysis.tradeBreakdown.chaseModeTrades || 0
+        },
+        tradeNearStoppedOut: latestDay.analysis.tradeNearStoppedOut
+      }
+    };
+  }
+
+  async clearData(endpoint: DataEndpoint) {
+    this.endpoints[endpoint].data = [];
+    if (typeof window === 'undefined') {
+      try {
+        await fs.unlink(this.endpoints[endpoint].path).catch(() => {});
+      } catch (error) {
+        console.error(`Error clearing ${endpoint} data:`, error);
+      }
+    } else {
+      localStorage.removeItem(this.endpoints[endpoint].storageKey);
+    }
+  }
+
+  // Legacy methods for backward compatibility
   async addDailyLog(day: DailyLog) {
-    await this.loadFromStorage();
-    // Remove any existing entry for the same date
-    this.allDays = this.allDays.filter(d => d.date !== day.date);
-    this.allDays.push(day);
-    // Sort by date descending
-    this.allDays.sort((a, b) => b.date.localeCompare(a.date));
-    await this.saveToStorage();
+    return this.addLog('daily', day);
+  }
+
+  async addCompareLog(day: DailyLog) {
+    return this.addLog('compare', day);
   }
 
   async getAllDays(): Promise<DailyLog[]> {
-    await this.loadFromStorage();
-    return this.allDays;
+    return this.getLogs('daily');
   }
 
-  // Group all days into weeks (Monday-Sunday)
+  async getCompareData(): Promise<DailyLog[]> {
+    return this.getLogs('compare');
+  }
+
+  async getBaseData(): Promise<TradingData | null> {
+    return this.getLatestLog('daily');
+  }
+
+  async getLatestCompareData(): Promise<TradingData | null> {
+    return this.getLatestLog('compare');
+  }
+
+  async clearCompareData() {
+    return this.clearData('compare');
+  }
+
   async groupLogsByWeek(): Promise<WeekLog[]> {
-    await this.loadFromStorage();
-    if (!this.allDays.length) return [];
-    // Helper to get Monday of the week
+    const allDays = await this.getLogs('daily');
+    if (!allDays.length) return [];
+
     function getWeekStart(dateStr: string) {
       const d = new Date(dateStr);
       const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
       const monday = new Date(d.setDate(diff));
       return monday.toISOString().split('T')[0];
     }
-    // Group by weekStart
+
     const weekMap: Record<string, DailyLog[]> = {};
-    for (const day of this.allDays) {
+    for (const day of allDays) {
       const weekStart = getWeekStart(day.date);
       if (!weekMap[weekStart]) weekMap[weekStart] = [];
       weekMap[weekStart].push(day);
     }
-    // Build WeekLog array
+
     const weekLogs: WeekLog[] = Object.entries(weekMap).map(([weekStart, days]) => {
-      // Sort days descending
       days.sort((a, b) => b.date.localeCompare(a.date));
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekEnd.getDate() + 6);
-      // Compute week headline (sum PnL, trades, wins, etc.)
       const weekHeadline = days.reduce((acc, d) => {
         acc.totalPnl = (acc.totalPnl || 0) + (d.analysis.headline.totalPnl || 0);
         acc.totalTrades = (acc.totalTrades || 0) + (d.analysis.headline.totalTrades || 0);
@@ -209,148 +305,72 @@ class TradingDataStore {
         weekHeadline,
       };
     });
-    // Sort weeks descending
+
     weekLogs.sort((a, b) => b.weekStart.localeCompare(a.weekStart));
     return weekLogs;
   }
 
-  async setCompareData(data: TradingData) {
-    this.compareData = data;
-    if (typeof window === 'undefined') {
-      try {
-        await this.ensureDataDirectory();
-        await fs.writeFile(
-          this.compareDataPath,
-          JSON.stringify(data, null, 2),
-          'utf-8'
-        );
-      } catch (error) {
-        console.error('Error saving compare data:', error);
-      }
-    } else {
-      // Client-side: Use localStorage as fallback
-      localStorage.setItem('trading_compare_data', JSON.stringify(data));
-    }
-  }
-
-  async getBaseData(): Promise<TradingData | null> {
-    if (typeof window === 'undefined') {
-      try {
-        await this.ensureDataDirectory();
-        const data = await fs.readFile(this.compareDataPath, 'utf-8');
-        const parsedData = JSON.parse(data);
-        this.compareData = parsedData;
-      } catch (error) {
-        console.error('Error loading compare data:', error);
-        this.compareData = null;
-      }
-    } else {
-      // Client-side: Use localStorage as fallback
-      const compareDataStr = localStorage.getItem('trading_compare_data');
-      if (compareDataStr) {
-        this.compareData = JSON.parse(compareDataStr);
-      }
-    }
-    return this.compareData;
-  }
-
-  getCompareData(): TradingData | null {
-    return this.compareData;
-  }
-
-  async updateBaseWithCompare(mergeOptions: {
+  async updateCompareWithBase(mergeOptions: {
     mergeAll?: boolean;
     mergeTradeIds?: number[];
     mergeDailyStats?: boolean;
   }): Promise<TradingData> {
-    if (!this.compareData) {
-      throw new Error('Both base and compare data must be set to perform merge');
+    const baseData = await this.getBaseData();
+    if (!baseData) {
+      throw new Error('Base data must be set to perform merge');
+    }
+
+    const latestCompare = await this.getLatestCompareData();
+    if (!latestCompare) {
+      throw new Error('Compare data must be set to perform merge');
     }
 
     const mergedData: TradingData = {
-      date: this.compareData.date,
+      date: latestCompare.date,
       analysis: {
-        headline: { ...this.compareData.analysis.headline },
-        sessions: { ...this.compareData.analysis.sessions },
-        protectionStats: { ...this.compareData.analysis.protectionStats },
-        tradeList: [...this.compareData.analysis.tradeList],
-        tradeBreakdown: { ...this.compareData.analysis.tradeBreakdown },
-        tradeNearStoppedOut: [...this.compareData.analysis.tradeNearStoppedOut]
+        headline: { ...latestCompare.analysis.headline },
+        sessions: { ...latestCompare.analysis.sessions },
+        protectionStats: { ...latestCompare.analysis.protectionStats },
+        tradeList: [...latestCompare.analysis.tradeList],
+        tradeBreakdown: { ...latestCompare.analysis.tradeBreakdown },
+        tradeNearStoppedOut: [...latestCompare.analysis.tradeNearStoppedOut]
       }
     };
 
     if (mergeOptions.mergeAll) {
-      this.compareData = mergedData;
+      await this.addLog('compare', {
+        date: baseData.date,
+        analysis: baseData.analysis
+      });
     } else {
       if (mergeOptions.mergeTradeIds) {
-        const compareTradeMap = new Map(this.compareData.analysis.tradeList.map(trade => [trade.id, trade]));
+        const baseTradeMap = new Map(baseData.analysis.tradeList.map(trade => [trade.id, trade]));
         for (const id of mergeOptions.mergeTradeIds) {
-          const compareTrade = compareTradeMap.get(id);
-          if (compareTrade) {
+          const baseTrade = baseTradeMap.get(id);
+          if (baseTrade) {
             const index = mergedData.analysis.tradeList.findIndex(t => t.id === id);
             if (index !== -1) {
-              mergedData.analysis.tradeList[index] = compareTrade;
+              mergedData.analysis.tradeList[index] = baseTrade;
             } else {
-              mergedData.analysis.tradeList.push(compareTrade);
+              mergedData.analysis.tradeList.push(baseTrade);
             }
           }
         }
       }
 
       if (mergeOptions.mergeDailyStats) {
-        mergedData.analysis.headline = { ...this.compareData.analysis.headline };
-        mergedData.analysis.sessions = { ...this.compareData.analysis.sessions };
-        mergedData.analysis.protectionStats = { ...this.compareData.analysis.protectionStats };
+        mergedData.analysis.headline = { ...baseData.analysis.headline };
+        mergedData.analysis.sessions = { ...baseData.analysis.sessions };
+        mergedData.analysis.protectionStats = { ...baseData.analysis.protectionStats };
       }
 
-      this.compareData = mergedData;
+      await this.addLog('compare', {
+        date: mergedData.date,
+        analysis: mergedData.analysis
+      });
     }
 
-    await this.saveToStorage();
-    return this.compareData;
-  }
-
-  async clearCompareData() {
-    this.compareData = null;
-    if (typeof window === 'undefined') {
-      try {
-        await fs.unlink(this.compareDataPath).catch(() => {});
-      } catch (error) {
-        console.error('Error clearing compare data:', error);
-      }
-    } else {
-      localStorage.removeItem('trading_compare_data');
-    }
-  }
-
-  // Helper method to get all trading days
-  async getAllTradingDays(): Promise<Date[]> {
-    const baseData = await this.getBaseData();
-    if (!baseData) return [];
-
-    const days = new Set<string>();
-    baseData.analysis.tradeList.forEach(trade => {
-      const date = new Date(trade.timestamp);
-      days.add(date.toISOString().split('T')[0]);
-    });
-
-    return Array.from(days).map(day => new Date(day));
-  }
-
-  // Helper method to get trades for a specific day
-  async getTradesForDay(date: Date): Promise<Trade[]> {
-    const baseData = await this.getBaseData();
-    if (!baseData) return [];
-
-    const dayStart = new Date(date);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(date);
-    dayEnd.setHours(23, 59, 59, 999);
-
-    return baseData.analysis.tradeList.filter(trade => {
-      const tradeDate = new Date(trade.timestamp);
-      return tradeDate >= dayStart && tradeDate <= dayEnd;
-    });
+    return mergedData;
   }
 }
 

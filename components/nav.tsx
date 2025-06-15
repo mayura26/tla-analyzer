@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Separator } from "@/components/ui/separator";
 
 const navItems = [
   {
@@ -13,6 +14,10 @@ const navItems = [
   {
     title: "Compare Data",
     href: "/compare"
+  },
+  {
+    title: "Weekly Summary",
+    href: "/weekly"
   },
   {
     title: "View Comparison",
@@ -33,19 +38,24 @@ export function Nav() {
             </Link>
           </div>
           <div className="flex items-center gap-6">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "text-sm font-medium transition-colors hover:text-primary",
-                  pathname === item.href
-                    ? "text-foreground"
-                    : "text-foreground/60"
+            {navItems.map((item, index) => (
+              <>
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "text-sm font-medium transition-colors hover:text-primary",
+                    pathname === item.href
+                      ? "text-foreground"
+                      : "text-foreground/60"
+                  )}
+                >
+                  {item.title}
+                </Link>
+                {index === 1 && (
+                  <div className="h-4 w-[1px] bg-gray-300 dark:bg-gray-700" />
                 )}
-              >
-                {item.title}
-              </Link>
+              </>
             ))}
             <ThemeToggle />
           </div>

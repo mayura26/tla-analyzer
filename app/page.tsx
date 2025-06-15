@@ -1,57 +1,93 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { WeeklyLogAccordion } from "@/components/WeeklyLogAccordion";
-import type { WeekLog } from "@/lib/trading-data-store";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function Home() {
-  const [weeks, setWeeks] = useState<WeekLog[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchWeeks() {
-      const res = await fetch("/api/trading-data/weeks");
-      if (res.ok) {
-        const data = await res.json();
-        setWeeks(data);
-      }
-      setLoading(false);
-    }
-    fetchWeeks();
-  }, []);
-
   return (
-    <div className="container mx-auto p-4">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-4">Trading Levels Algo</h1>
-        <p className="text-xl text-muted-foreground">
-          Backtested data for the Trading Levels Algo using 5MNQ
-        </p>
-      </div>
-
-      {loading ? (
-        <div>Loading...</div>
-      ) : weeks.length === 0 ? (
+    <main className="flex min-h-screen flex-col p-8">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Stats Cards */}
         <Card>
-          <CardHeader>
-            <CardTitle>No Trading Logs Found</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Analysis</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="mb-4">
-              Start by uploading your trading logs to see your analysis.
+            <div className="text-2xl font-bold">0</div>
+            <p className="text-xs text-muted-foreground">
+              Total number of analyses performed
             </p>
-            <Button asChild>
-              <Link href="/input">Upload Trading Logs</Link>
-            </Button>
           </CardContent>
         </Card>
-      ) : (
-        <WeeklyLogAccordion weeks={weeks} />
-      )}
-      <div className="mb-24" />
-    </div>
-  );
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">0%</div>
+            <p className="text-xs text-muted-foreground">
+              Successful analysis rate
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Average Time</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">0s</div>
+            <p className="text-xs text-muted-foreground">
+              Average analysis time
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Last Analysis</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">-</div>
+            <p className="text-xs text-muted-foreground">
+              Time since last analysis
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts Section */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7 mt-4">
+        <Card className="col-span-4">
+          <CardHeader>
+            <CardTitle>Analysis Overview</CardTitle>
+            <CardDescription>
+              Analysis trends over time
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pl-2">
+            <div className="h-[300px] flex items-center justify-center border rounded-lg">
+              Chart placeholder
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="col-span-3">
+          <CardHeader>
+            <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>
+              Latest analysis results
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center">
+                <div className="ml-4 space-y-1">
+                  <p className="text-sm font-medium leading-none">No recent activity</p>
+                  <p className="text-sm text-muted-foreground">
+                    Start analyzing to see results here
+                  </p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </main>
+  )
 }

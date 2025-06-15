@@ -42,24 +42,3 @@ export async function POST(request: Request) {
     );
   }
 }
-
-export async function PUT(request: Request) {
-  try {
-    const { mergeOptions } = await request.json();
-    if (!mergeOptions) {
-      return NextResponse.json(
-        { error: 'Merge options are required' },
-        { status: 400 }
-      );
-    }
-
-    const updatedData = await tradingDataStore.updateBaseWithCompare(mergeOptions);
-    return NextResponse.json(updatedData);
-  } catch (error) {
-    console.error('Error updating trading data:', error);
-    return NextResponse.json(
-      { error: 'Failed to update trading data' },
-      { status: 500 }
-    );
-  }
-} 

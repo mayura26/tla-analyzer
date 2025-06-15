@@ -342,6 +342,207 @@
     }
   },
   {
+    "date": "2025-02-20",
+    "analysis": {
+      "headline": {
+        "totalPnl": 94.5,
+        "totalTrades": 10,
+        "wins": 3,
+        "losses": 2,
+        "bigWins": 1,
+        "bigLosses": 2,
+        "trailingDrawdown": -254.2,
+        "contracts": 5,
+        "maxPotentialGainPerContract": 69.74,
+        "pnlPerTrade": 9.45,
+        "maxProfit": 360,
+        "maxRisk": 260,
+        "maxDailyGain": 500,
+        "maxDailyLoss": -500
+      },
+      "sessions": {
+        "morning": {
+          "pnl": 240.6,
+          "trades": 2,
+          "avgPnlPerTrade": 120.3
+        },
+        "main": {
+          "pnl": -127.4,
+          "trades": 7,
+          "avgPnlPerTrade": -18.2
+        },
+        "midday": {
+          "pnl": -35.3,
+          "trades": 4,
+          "avgPnlPerTrade": -8.82
+        },
+        "afternoon": {
+          "pnl": -92.1,
+          "trades": 3,
+          "avgPnlPerTrade": -30.7
+        },
+        "end": {
+          "pnl": -18.7,
+          "trades": 1,
+          "avgPnlPerTrade": -18.7
+        }
+      },
+      "tradeBreakdown": {
+        "ordersGenerated": 11,
+        "ordersFilled": 10,
+        "fillRate": 91,
+        "chaseModeTradesPnl": 0,
+        "chaseModeTrades": 0
+      },
+      "protectionStats": {
+        "blockedTrades": {
+          "protective": 7,
+          "dynamicRange": 0,
+          "bounceProtect": 8,
+          "predictiveWickProtect": 11,
+          "badStructure": 0,
+          "atrProtect": 0,
+          "volDeltaProtect": 23,
+          "softChaseProtect": 0
+        },
+        "fillProtection": {
+          "fillProtect": 2,
+          "maxFillProtect": 0,
+          "chaseFillProtect": 0,
+          "chopZoneFill": 0,
+          "fillProactive": 0
+        },
+        "chaseMode": {
+          "trades": 0,
+          "restarts": 4
+        }
+      },
+      "tradeNearStoppedOut": [],
+      "tradeList": [
+        {
+          "id": 1,
+          "timestamp": "2025-02-20T14:06:00.000Z",
+          "direction": "LONG",
+          "entryPrice": 22211.5,
+          "exitPrice": 22210.25,
+          "exitReason": "SL",
+          "pnl": -8.48,
+          "points": -2,
+          "quantity": 2,
+          "isChaseTrade": false
+        },
+        {
+          "id": 2,
+          "timestamp": "2025-02-20T14:36:00.000Z",
+          "direction": "SHORT",
+          "entryPrice": 22194.75,
+          "exitPrice": 22153,
+          "exitReason": "TP",
+          "pnl": 163.52,
+          "points": 41,
+          "quantity": 2,
+          "isChaseTrade": false
+        },
+        {
+          "id": 3,
+          "timestamp": "2025-02-20T16:00:00.000Z",
+          "direction": "SHORT",
+          "entryPrice": 22016,
+          "exitPrice": 22031.75,
+          "exitReason": "SL",
+          "pnl": -23.7,
+          "points": -2.25,
+          "quantity": 5,
+          "isChaseTrade": false
+        },
+        {
+          "id": 4,
+          "timestamp": "2025-02-20T16:24:00.000Z",
+          "direction": "LONG",
+          "entryPrice": 22040,
+          "exitPrice": 22035,
+          "exitReason": "SL",
+          "pnl": -23.48,
+          "points": -5.75,
+          "quantity": 2,
+          "isChaseTrade": false
+        },
+        {
+          "id": 5,
+          "timestamp": "2025-02-20T16:45:00.000Z",
+          "direction": "LONG",
+          "entryPrice": 22046.5,
+          "exitPrice": 22033.5,
+          "exitReason": "MANUAL",
+          "pnl": -138.7,
+          "points": -13.75,
+          "quantity": 5,
+          "isChaseTrade": false
+        },
+        {
+          "id": 6,
+          "timestamp": "2025-02-20T17:12:00.000Z",
+          "direction": "LONG",
+          "entryPrice": 22068.75,
+          "exitPrice": 22083.25,
+          "exitReason": "SL",
+          "pnl": 54.52,
+          "points": 13.75,
+          "quantity": 2,
+          "isChaseTrade": false
+        },
+        {
+          "id": 7,
+          "timestamp": "2025-02-20T18:03:00.000Z",
+          "direction": "SHORT",
+          "entryPrice": 22047.5,
+          "exitPrice": 22062.5,
+          "exitReason": "SL",
+          "pnl": -158.7,
+          "points": -15.75,
+          "quantity": 5,
+          "isChaseTrade": false
+        },
+        {
+          "id": 8,
+          "timestamp": "2025-02-20T19:06:00.000Z",
+          "direction": "LONG",
+          "entryPrice": 22077.75,
+          "exitPrice": 22089.25,
+          "exitReason": "SL",
+          "pnl": 42.52,
+          "points": 10.75,
+          "quantity": 2,
+          "isChaseTrade": false
+        },
+        {
+          "id": 9,
+          "timestamp": "2025-02-20T20:06:00.000Z",
+          "direction": "LONG",
+          "entryPrice": 22104.5,
+          "exitPrice": 22102.25,
+          "exitReason": "MANUAL",
+          "pnl": -30.7,
+          "points": -3,
+          "quantity": 5,
+          "isChaseTrade": false
+        },
+        {
+          "id": 10,
+          "timestamp": "2025-02-20T20:24:00.000Z",
+          "direction": "LONG",
+          "entryPrice": 22104.75,
+          "exitPrice": 22103.75,
+          "exitReason": "MANUAL",
+          "pnl": -18.7,
+          "points": -1.75,
+          "quantity": 5,
+          "isChaseTrade": false
+        }
+      ]
+    }
+  },
+  {
     "date": "2025-02-19",
     "analysis": {
       "headline": {
@@ -402,7 +603,7 @@
           "predictiveWickProtect": 0,
           "badStructure": 0,
           "atrProtect": 0,
-          "volDeltaProtect": 4,
+          "volDeltaProtect": 6,
           "softChaseProtect": 0
         },
         "fillProtection": {

@@ -356,8 +356,5 @@ export function parseTradingLog(logData: string): TradingLogAnalysis {
     }
   }
 
-  // Log the parsed object for validation
-  console.log(analysis);
-
   return analysis;
 } 
