@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Separator } from "@/components/ui/separator";
+import React from "react";
 
 const navItems = [
   {
@@ -39,9 +40,8 @@ export function Nav() {
           </div>
           <div className="flex items-center gap-6">
             {navItems.map((item, index) => (
-              <>
+              <React.Fragment key={item.href}>
                 <Link
-                  key={item.href}
                   href={item.href}
                   className={cn(
                     "text-sm font-medium transition-colors hover:text-primary",
@@ -55,7 +55,7 @@ export function Nav() {
                 {index === 1 && (
                   <div className="h-4 w-[1px] bg-gray-300 dark:bg-gray-700" />
                 )}
-              </>
+              </React.Fragment>
             ))}
             <ThemeToggle />
           </div>

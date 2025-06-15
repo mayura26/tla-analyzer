@@ -2,73 +2,31 @@
 
 import { useEffect, useState } from "react";
 import { CompareWeeklyAccordion } from "@/components/CompareWeeklyAccordion";
-import type { WeekLog } from "@/lib/trading-data-store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 export default function CompareViewPage() {
-  const [baseWeeks, setBaseWeeks] = useState<WeekLog[]>([]);
-  const [compareWeeks, setCompareWeeks] = useState<WeekLog[]>([]);
+  const [weeks, setWeeks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [baseRes, compareRes] = await Promise.all([
-          fetch("/api/trading-data/weeks"),
-          fetch("/api/trading-data/compare")
-        ]);
-
-        if (baseRes.ok && compareRes.ok) {
-          const [baseData, compareData] = await Promise.all([
-            baseRes.json(),
-            compareRes.json()
-          ]);
-          setBaseWeeks(baseData);
-          if (compareData) {
-            // Transform compare data into WeekLog format
-            const compareWeek: WeekLog = {
-              weekStart: compareData.date,
-              weekEnd: compareData.date,
-              days: [{
-                date: compareData.date,
-                analysis: {
-                  headline: {
-                    totalPnl: compareData.analysis.headline.totalPnl,
-                    totalTrades: compareData.analysis.headline.totalTrades,
-                    wins: compareData.analysis.headline.wins,
-                    losses: compareData.analysis.headline.losses,
-                    bigWins: compareData.analysis.headline.bigWins,
-                    bigLosses: compareData.analysis.headline.bigLosses,
-                    trailingDrawdown: compareData.analysis.headline.trailingDrawdown,
-                    contracts: compareData.analysis.headline.contracts,
-                    maxPotentialGainPerContract: compareData.analysis.headline.maxPotentialGainPerContract,
-                    pnlPerTrade: compareData.analysis.headline.pnlPerTrade,
-                    maxProfit: compareData.analysis.headline.maxProfit,
-                    maxRisk: compareData.analysis.headline.maxRisk,
-                    maxDailyGain: compareData.analysis.headline.maxDailyGain,
-                    maxDailyLoss: compareData.analysis.headline.maxDailyLoss
-                  },
-                  sessions: compareData.analysis.sessions,
-                  protectionStats: compareData.analysis.protectionStats,
-                  tradeList: compareData.analysis.tradeList,
-                  tradeBreakdown: compareData.analysis.tradeBreakdown,
-                  tradeNearStoppedOut: compareData.analysis.tradeNearStoppedOut
-                }
-              }],
-              weekHeadline: {
-                totalPnl: compareData.analysis.headline.totalPnl,
-                totalTrades: compareData.analysis.headline.totalTrades,
-                wins: compareData.analysis.headline.wins,
-                losses: compareData.analysis.headline.losses
-              }
-            };
-            setCompareWeeks([compareWeek]);
-          }
+        const res = await fetch("/api/trading-data/compare");
+        if (!res.ok) {
+          throw new Error(`Failed to fetch comparison data: ${res.statusText}`);
         }
+        const data = await res.json();
+        if (!Array.isArray(data)) {
+          throw new Error("Invalid data format received");
+        }
+        setWeeks(data);
       } catch (error) {
-        console.error("Error fetching data:", error);
+        setError(error instanceof Error ? error.message : "Failed to load comparison data");
       } finally {
         setLoading(false);
       }
@@ -85,23 +43,19 @@ export default function CompareViewPage() {
         </p>
       </div>
 
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
       {loading ? (
-        <div>Loading...</div>
-      ) : baseWeeks.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No Trading Logs Found</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="mb-4">
-              Start by uploading your trading logs to see your analysis.
-            </p>
-            <Button asChild>
-              <Link href="/input">Upload Trading Logs</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      ) : compareWeeks.length === 0 ? (
+        <div className="flex items-center justify-center p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      ) : weeks.length === 0 ? (
         <Card>
           <CardHeader>
             <CardTitle>No Comparison Data</CardTitle>
@@ -116,9 +70,9 @@ export default function CompareViewPage() {
           </CardContent>
         </Card>
       ) : (
-        <CompareWeeklyAccordion baseWeeks={baseWeeks} compareWeeks={compareWeeks} />
+        <CompareWeeklyAccordion weeks={weeks} />
       )}
       <div className="mb-24" />
     </div>
   );
-} 
+}

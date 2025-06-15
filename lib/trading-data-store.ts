@@ -72,7 +72,18 @@ export interface WeekLog {
   weekStart: string;
   weekEnd: string;
   days: DailyLog[];
-  weekHeadline: any;
+  weekHeadline: {
+    totalPnl: number;
+    totalTrades: number;
+    wins: number;
+    losses: number;
+  };
+  baseComparison?: {
+    totalPnl: number;
+    totalTrades: number;
+    wins: number;
+    losses: number;
+  } | null;
 }
 
 type DataEndpoint = 'daily' | 'compare';

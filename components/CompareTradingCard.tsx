@@ -79,14 +79,20 @@ export function CompareTradingCard({ baseStats, compareStats }: CompareTradingCa
     }
   };
 
+  // Muted style for no significant differences
+  const mutedCardClass = !hasChanges ? "opacity-60 scale-90 bg-muted border-muted text-muted-foreground shadow-none rounded-md p-1 min-h-0" : "";
+  const mutedHeaderClass = !hasChanges ? "py-1" : "";
+  const mutedTitleClass = !hasChanges ? "text-base text-muted-foreground font-medium text-center w-full" : "";
+  const mutedContentClass = !hasChanges ? "py-1 px-2" : "";
+
   return (
-    <Card className="relative">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">
+    <Card className={`relative ${mutedCardClass}`}>
+      <CardHeader className={`pb-2 ${mutedHeaderClass}`}>
+        <CardTitle className={`text-lg ${mutedTitleClass}`}>
           {format(baseStats.date, 'MMM dd, yyyy')}
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className={mutedContentClass}>
         {hasChanges ? (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -157,9 +163,8 @@ export function CompareTradingCard({ baseStats, compareStats }: CompareTradingCa
             </Accordion>
           </div>
         ) : (
-          <div className="text-center py-4 text-muted-foreground">
-            No significant differences found
-          </div>
+          // Only show the date, no extra text or padding
+          <></>
         )}
       </CardContent>
     </Card>

@@ -3,18 +3,15 @@ import { useState } from "react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { CompareTradingCard } from "@/components/CompareTradingCard";
-import type { WeekLog, DailyLog } from "@/lib/trading-data-store";
-import { DailyStats } from "@/lib/trading-log-parser";
 import { format } from "date-fns";
 import { TrendingUp, TrendingDown, Target, DollarSign } from "lucide-react";
 
 interface CompareWeeklyAccordionProps {
-  baseWeeks: WeekLog[];
-  compareWeeks: WeekLog[];
+  weeks: any[];
 }
 
-export function CompareWeeklyAccordion({ baseWeeks, compareWeeks }: CompareWeeklyAccordionProps) {
-  const [openWeek, setOpenWeek] = useState(baseWeeks.length > 0 ? baseWeeks[0].weekStart : "");
+export function CompareWeeklyAccordion({ weeks }: CompareWeeklyAccordionProps) {
+  const [openWeek, setOpenWeek] = useState(weeks.length > 0 ? weeks[0].weekStart : "");
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -39,10 +36,10 @@ export function CompareWeeklyAccordion({ baseWeeks, compareWeeks }: CompareWeekl
     return 'text-red-500'
   }
 
-  const transformToDailyStats = (day: DailyLog): DailyStats => {
-    const { analysis } = day;
-    // Parse date as local (no UTC shift)
-    let dateParts = day.date.split('-');
+  // Accepts analysis object and date
+  const transformToDailyStats = (analysis: any, date: string) => {
+    if (!analysis) return undefined;
+    let dateParts = date.split('-');
     let localDate = new Date(
       Number(dateParts[0]),
       Number(dateParts[1]) - 1,
@@ -66,30 +63,13 @@ export function CompareWeeklyAccordion({ baseWeeks, compareWeeks }: CompareWeekl
       maxDailyGain: analysis.headline.maxDailyGain || 0,
       maxDailyLoss: analysis.headline.maxDailyLoss || 0,
       sessionBreakdown: {
-        morning: analysis.sessions.morning || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
-        main: analysis.sessions.main || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
-        midday: analysis.sessions.midday || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
-        afternoon: analysis.sessions.afternoon || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
-        end: analysis.sessions.end || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
+        morning: analysis.sessions?.morning || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
+        main: analysis.sessions?.main || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
+        midday: analysis.sessions?.midday || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
+        afternoon: analysis.sessions?.afternoon || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
+        end: analysis.sessions?.end || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
       },
       protectionStats: analysis.protectionStats,
-    };
-  };
-
-  const calculateWeekDifference = (baseWeek: WeekLog, compareWeek: WeekLog) => {
-    const basePnl = baseWeek.weekHeadline.totalPnl ?? 0;
-    const comparePnl = compareWeek.weekHeadline.totalPnl ?? 0;
-    const pnlDiff = comparePnl - basePnl;
-    const tradesDiff = (compareWeek.weekHeadline.totalTrades ?? 0) - (baseWeek.weekHeadline.totalTrades ?? 0);
-    const winsDiff = (compareWeek.weekHeadline.wins ?? 0) - (baseWeek.weekHeadline.wins ?? 0);
-    const lossesDiff = (compareWeek.weekHeadline.losses ?? 0) - (baseWeek.weekHeadline.losses ?? 0);
-
-    return {
-      pnlDiff,
-      tradesDiff,
-      winsDiff,
-      lossesDiff,
-      hasChanges: pnlDiff !== 0 || tradesDiff !== 0 || winsDiff !== 0 || lossesDiff !== 0
     };
   };
 
@@ -111,47 +91,49 @@ export function CompareWeeklyAccordion({ baseWeeks, compareWeeks }: CompareWeekl
 
   return (
     <Accordion type="single" collapsible value={openWeek} onValueChange={setOpenWeek} className="w-full">
-      {baseWeeks.map((baseWeek) => {
-        const compareWeek = compareWeeks.find(w => w.weekStart === baseWeek.weekStart);
-        if (!compareWeek) return null;
-
-        // Find overlapping days by date
-        const overlappingDates = baseWeek.days
-          .map(day => day.date)
-          .filter(date => compareWeek.days.some(cd => cd.date === date));
-        const baseDays = baseWeek.days.filter(day => overlappingDates.includes(day.date));
-        const compareDays = compareWeek.days.filter(day => overlappingDates.includes(day.date));
-
-        // Recalculate weekHeadline for base and compare using only overlapping days
-        const recalcHeadline = (days: DailyLog[]) => days.reduce((acc, d) => {
-          acc.totalPnl = (acc.totalPnl || 0) + (d.analysis.headline.totalPnl || 0);
-          acc.totalTrades = (acc.totalTrades || 0) + (d.analysis.headline.totalTrades || 0);
-          acc.wins = (acc.wins || 0) + (d.analysis.headline.wins || 0);
-          acc.losses = (acc.losses || 0) + (d.analysis.headline.losses || 0);
-          return acc;
-        }, {} as any);
-        const baseHeadline = recalcHeadline(baseDays);
-        const compareHeadline = recalcHeadline(compareDays);
-
-        const diff = {
-          pnlDiff: (compareHeadline.totalPnl || 0) - (baseHeadline.totalPnl || 0),
-          tradesDiff: (compareHeadline.totalTrades || 0) - (baseHeadline.totalTrades || 0),
-          winsDiff: (compareHeadline.wins || 0) - (baseHeadline.wins || 0),
-          lossesDiff: (compareHeadline.losses || 0) - (baseHeadline.losses || 0),
-          hasChanges:
-            (compareHeadline.totalPnl || 0) !== (baseHeadline.totalPnl || 0) ||
-            (compareHeadline.totalTrades || 0) !== (baseHeadline.totalTrades || 0) ||
-            (compareHeadline.wins || 0) !== (baseHeadline.wins || 0) ||
-            (compareHeadline.losses || 0) !== (baseHeadline.losses || 0)
-        };
+      {weeks.map((week: any) => {
         // Parse weekStart and weekEnd as local dates
-        let [sy, sm, sd] = baseWeek.weekStart.split('-');
+        let [sy, sm, sd] = week.weekStart.split('-');
         let weekStartDate = new Date(Number(sy), Number(sm) - 1, Number(sd));
-        let [ey, em, ed] = baseWeek.weekEnd.split('-');
+        let [ey, em, ed] = week.weekEnd.split('-');
         let weekEndDate = new Date(Number(ey), Number(em) - 1, Number(ed));
 
+        // Calculate diffs for the week
+        const diff = {
+          pnlDiff: (week.compareHeadline.totalPnl || 0) - (week.baseHeadline.totalPnl || 0),
+          tradesDiff: (week.compareHeadline.totalTrades || 0) - (week.baseHeadline.totalTrades || 0),
+          winsDiff: (week.compareHeadline.wins || 0) - (week.baseHeadline.wins || 0),
+          lossesDiff: (week.compareHeadline.losses || 0) - (week.baseHeadline.losses || 0),
+          hasChanges:
+            (week.compareHeadline.totalPnl || 0) !== (week.baseHeadline.totalPnl || 0) ||
+            (week.compareHeadline.totalTrades || 0) !== (week.baseHeadline.totalTrades || 0) ||
+            (week.compareHeadline.wins || 0) !== (week.baseHeadline.wins || 0) ||
+            (week.compareHeadline.losses || 0) !== (week.baseHeadline.losses || 0)
+        };
+
+        // Split days into those with and without significant differences
+        const daysWithDiffs: any[] = [];
+        const daysNoDiffs: any[] = [];
+        week.days.forEach((day: any) => {
+          const baseStats = day.baseAnalysis ? transformToDailyStats(day.baseAnalysis, day.date) : null;
+          const compareStats = day.compareAnalysis ? transformToDailyStats(day.compareAnalysis, day.date) : null;
+          if (!baseStats || !compareStats) return;
+          const pnlDiff = (compareStats.totalPnl ?? 0) - (baseStats.totalPnl ?? 0);
+          const tradesDiff = (compareStats.totalTrades ?? 0) - (baseStats.totalTrades ?? 0);
+          const winsDiff = (compareStats.wins ?? 0) - (baseStats.wins ?? 0);
+          const lossesDiff = (compareStats.losses ?? 0) - (baseStats.losses ?? 0);
+          const bigWinDiff = (compareStats.bigWins ?? 0) - (baseStats.bigWins ?? 0);
+          const bigLossDiff = (compareStats.bigLosses ?? 0) - (baseStats.bigLosses ?? 0);
+          const hasChanges = pnlDiff !== 0 || tradesDiff !== 0 || winsDiff !== 0 || lossesDiff !== 0 || bigWinDiff !== 0 || bigLossDiff !== 0;
+          if (hasChanges) {
+            daysWithDiffs.push(day);
+          } else {
+            daysNoDiffs.push(day);
+          }
+        });
+
         return (
-          <AccordionItem key={baseWeek.weekStart} value={baseWeek.weekStart} className="border rounded-lg mb-4">
+          <AccordionItem key={week.weekStart} value={week.weekStart} className="border rounded-lg mb-4">
             <AccordionTrigger className="px-6 py-4 hover:no-underline">
               <div className="flex flex-col w-full">
                 <div className="flex items-center justify-between w-full">
@@ -188,26 +170,47 @@ export function CompareWeeklyAccordion({ baseWeeks, compareWeeks }: CompareWeekl
               </div>
             </AccordionTrigger>
             <AccordionContent className="px-6 pb-6">
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {baseDays
-                  .sort((a, b) => {
-                    const dateA = new Date(a.date);
-                    const dateB = new Date(b.date);
-                    return dateA.getTime() - dateB.getTime();
-                  })
-                  .map((baseDay) => {
-                    const compareDay = compareDays.find(d => d.date === baseDay.date);
-                    if (!compareDay) return null;
-
-                    return (
-                      <CompareTradingCard
-                        key={baseDay.date}
-                        baseStats={transformToDailyStats(baseDay)}
-                        compareStats={transformToDailyStats(compareDay)}
-                      />
-                    );
-                  })}
-              </div>
+              {/* Days with significant differences */}
+              {daysWithDiffs.length > 0 && (
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-4">
+                  {daysWithDiffs
+                    .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                    .map((day: any) => {
+                      const baseStats = day.baseAnalysis ? transformToDailyStats(day.baseAnalysis, day.date) : null;
+                      const compareStats = day.compareAnalysis ? transformToDailyStats(day.compareAnalysis, day.date) : null;
+                      if (!baseStats || !compareStats) return null;
+                      return (
+                        <CompareTradingCard
+                          key={day.date}
+                          baseStats={baseStats}
+                          compareStats={compareStats}
+                        />
+                      );
+                    })}
+                </div>
+              )}
+              {/* Days with no significant differences */}
+              {daysNoDiffs.length > 0 && (
+                <div className="mt-2">
+                  <div className="text-xs text-muted-foreground mb-2">No Significant Differences</div>
+                  <div className="grid gap-2 grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                    {daysNoDiffs
+                      .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                      .map((day: any) => {
+                        const baseStats = day.baseAnalysis ? transformToDailyStats(day.baseAnalysis, day.date) : null;
+                        const compareStats = day.compareAnalysis ? transformToDailyStats(day.compareAnalysis, day.date) : null;
+                        if (!baseStats || !compareStats) return null;
+                        return (
+                          <CompareTradingCard
+                            key={day.date}
+                            baseStats={baseStats}
+                            compareStats={compareStats}
+                          />
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
             </AccordionContent>
           </AccordionItem>
         );
