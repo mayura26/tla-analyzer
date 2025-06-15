@@ -18,13 +18,22 @@ export async function GET() {
     const compareDataPath = path.join(process.cwd(), "data", "compare-data.json");
     const baseDataPath = path.join(process.cwd(), "data", "all-days.json");
 
-    const [compareDataRaw, baseDataRaw] = await Promise.all([
-      fs.readFile(compareDataPath, "utf-8"),
-      fs.readFile(baseDataPath, "utf-8")
-    ]);
+    let compareData: any[] = [];
+    let baseData: any[] = [];
 
-    const compareData = JSON.parse(compareDataRaw);
-    const baseData = JSON.parse(baseDataRaw);
+    try {
+      const [compareDataRaw, baseDataRaw] = await Promise.all([
+        fs.readFile(compareDataPath, "utf-8"),
+        fs.readFile(baseDataPath, "utf-8")
+      ]);
+
+      // Safely parse JSON with fallback to empty array
+      compareData = compareDataRaw ? JSON.parse(compareDataRaw) : [];
+      baseData = baseDataRaw ? JSON.parse(baseDataRaw) : [];
+    } catch (error) {
+      console.error("Error reading or parsing data files:", error);
+      // Continue with empty arrays if files don't exist or are malformed
+    }
 
     // Group compare and base data by week
     const compareWeeksMap = new Map();
@@ -42,6 +51,11 @@ export async function GET() {
 
     // Only include weeks that exist in the compare data
     const allWeekKeys = Array.from(compareWeeksMap.keys()).sort();
+
+    // If no weeks found, return empty array
+    if (allWeekKeys.length === 0) {
+      return NextResponse.json([]);
+    }
 
     // Build WeekLog objects for each week
     const weekLogs = allWeekKeys.map(weekKey => {
@@ -64,8 +78,8 @@ export async function GET() {
         const baseDay = baseDaysMap.get(date);
         return {
           date,
-          compareAnalysis: compareDay ? compareDay.analysis : null,
-          baseAnalysis: baseDay ? baseDay.analysis : null
+          compareAnalysis: compareDay ? (compareDay as any).analysis : null,
+          baseAnalysis: baseDay ? (baseDay as any).analysis : null
         };
       });
       // Calculate weekHeadline for compare and base
@@ -120,11 +134,20 @@ export async function POST(request: Request) {
     // Always extract the date from the log text (first YYYY-MM-DD found)
     const match = logData.match(/(\d{4}-\d{2}-\d{2})/);
     const date = match ? match[1] : new Date().toISOString().split('T')[0];
-    await tradingDataStore.addCompareLog({
-      date,
-      analysis: parsedData
-    });
-    return NextResponse.json({ success: true });
+
+    try {
+      await tradingDataStore.addCompareLog({
+        date,
+        analysis: parsedData
+      });
+      return NextResponse.json({ success: true });
+    } catch (error) {
+      console.error('Error saving compare data:', error);
+      return NextResponse.json(
+        { error: 'Failed to save compare data' },
+        { status: 500 }
+      );
+    }
   } catch (error) {
     console.error('Error processing compare data:', error);
     return NextResponse.json(

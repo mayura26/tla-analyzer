@@ -4,6 +4,8 @@ import { DailyStats } from "@/lib/trading-log-parser";
 import { format } from "date-fns";
 import { TrendingUp, TrendingDown, Target, DollarSign, ArrowRight, Trophy, AlertTriangle } from "lucide-react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { useState } from "react";
+import { CompareTradingDialog } from "./CompareTradingDialog";
 
 interface CompareTradingCardProps {
   baseStats: DailyStats;
@@ -11,6 +13,8 @@ interface CompareTradingCardProps {
 }
 
 export function CompareTradingCard({ baseStats, compareStats }: CompareTradingCardProps) {
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -86,87 +90,99 @@ export function CompareTradingCard({ baseStats, compareStats }: CompareTradingCa
   const mutedContentClass = !hasChanges ? "py-1 px-2" : "";
 
   return (
-    <Card className={`relative ${mutedCardClass}`}>
-      <CardHeader className={`pb-2 ${mutedHeaderClass}`}>
-        <CardTitle className={`text-lg ${mutedTitleClass}`}>
-          {format(baseStats.date, 'MMM dd, yyyy')}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className={mutedContentClass}>
-        {hasChanges ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-muted-foreground" />
-                <span className={`font-semibold ${getPnlDiffColor(pnlDiff.value)}`}>
-                  {formatDifference(pnlDiff)}
+    <>
+      <Card 
+        className={`relative ${mutedCardClass} cursor-pointer hover:shadow-lg transition-shadow duration-200`}
+        onClick={() => setIsDialogOpen(true)}
+      >
+        <CardHeader className={`pb-2 ${mutedHeaderClass}`}>
+          <CardTitle className={`text-lg ${mutedTitleClass}`}>
+            {format(baseStats.date, 'MMM dd, yyyy')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className={mutedContentClass}>
+          {hasChanges ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="w-4 h-4 text-muted-foreground" />
+                  <span className={`font-semibold ${getPnlDiffColor(pnlDiff.value)}`}>
+                    {formatDifference(pnlDiff)}
+                  </span>
+                </div>
+                {getPnlIcon(pnlDiff.value)}
+              </div>
+
+              <div className={`flex items-center gap-4 flex-wrap ${
+                winsDiff === 0 && lossesDiff === 0 && tradesDiff === 0 && bigWinDiff === 0 && bigLossDiff === 0
+                  ? 'text-muted-foreground opacity-70'
+                  : 'text-foreground font-semibold'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <Target className="w-4 h-4 text-muted-foreground" />
+                  <span>
+                    {winsDiff >= 0 ? '+' : ''}{winsDiff}W / {lossesDiff >= 0 ? '+' : ''}{lossesDiff}L
+                  </span>
+                </div>
+                <Badge variant="outline">
+                  {tradesDiff >= 0 ? '+' : ''}{tradesDiff} trades
+                </Badge>
+                <span className="flex items-center gap-1">
+                  <Trophy className="w-4 h-4 text-yellow-500" />
+                  {bigWinDiff >= 0 ? '+' : ''}{bigWinDiff}BW / {bigLossDiff >= 0 ? '+' : ''}{bigLossDiff}BL
                 </span>
               </div>
-              {getPnlIcon(pnlDiff.value)}
-            </div>
 
-            <div className={`flex items-center gap-4 flex-wrap ${
-              winsDiff === 0 && lossesDiff === 0 && tradesDiff === 0 && bigWinDiff === 0 && bigLossDiff === 0
-                ? 'text-muted-foreground opacity-70'
-                : 'text-foreground font-semibold'
-            }`}>
-              <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-muted-foreground" />
-                <span>
-                  {winsDiff >= 0 ? '+' : ''}{winsDiff}W / {lossesDiff >= 0 ? '+' : ''}{lossesDiff}L
-                </span>
-              </div>
-              <Badge variant="outline">
-                {tradesDiff >= 0 ? '+' : ''}{tradesDiff} trades
-              </Badge>
-              <span className="flex items-center gap-1">
-                <Trophy className="w-4 h-4 text-yellow-500" />
-                {bigWinDiff >= 0 ? '+' : ''}{bigWinDiff}BW / {bigLossDiff >= 0 ? '+' : ''}{bigLossDiff}BL
-              </span>
-            </div>
-
-            <Accordion type="single" collapsible>
-              <AccordionItem value="compare-details">
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="grid grid-cols-2 gap-4 w-full">
-                    <div className="flex flex-col items-start space-y-1">
-                      <div className="text-sm text-muted-foreground">Base Stats</div>
-                      <div className="font-medium">
-                        <span className={getPnlColor(baseStats.totalPnl)}>{formatCurrency(baseStats.totalPnl)}</span>
+              <Accordion type="single" collapsible>
+                <AccordionItem value="compare-details">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="grid grid-cols-2 gap-4 w-full">
+                      <div className="flex flex-col items-start space-y-1">
+                        <div className="text-sm text-muted-foreground">Base Stats</div>
+                        <div className="font-medium">
+                          <span className={getPnlColor(baseStats.totalPnl)}>{formatCurrency(baseStats.totalPnl)}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-start space-y-1">
+                        <div className="text-sm text-muted-foreground">Compare Stats</div>
+                        <div className="font-medium">
+                          <span className={getPnlColor(compareStats.totalPnl)}>{formatCurrency(compareStats.totalPnl)}</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex flex-col items-start space-y-1">
-                      <div className="text-sm text-muted-foreground">Compare Stats</div>
-                      <div className="font-medium">
-                        <span className={getPnlColor(compareStats.totalPnl)}>{formatCurrency(compareStats.totalPnl)}</span>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="grid grid-cols-2 gap-4 w-full">
+                      <div className="flex flex-col gap-2 pt-2 pb-2">
+                        <div className={`text-xs font-semibold ${getWinRateColor(baseStats.wins, baseStats.totalTrades)}`}>WR: {baseStats.totalTrades > 0 ? ((baseStats.wins / baseStats.totalTrades) * 100).toFixed(1) : '0.0'}%</div>
+                        <Badge variant="outline" className="text-[10px] md:text-xs px-2 py-0.5">{baseStats.totalTrades} trades</Badge>
+                        <div className="text-sm">{baseStats.wins}W / {baseStats.losses}L</div>
+                        <div className="text-sm">{baseStats.bigWins}BW / {baseStats.bigLosses}BL</div>
+                      </div>
+                      <div className="flex flex-col gap-2 pt-2 pb-2">
+                        <div className={`text-xs font-semibold ${getWinRateColor(compareStats.wins, compareStats.totalTrades)}`}>WR: {compareStats.totalTrades > 0 ? ((compareStats.wins / compareStats.totalTrades) * 100).toFixed(1) : '0.0'}%</div>
+                        <Badge variant="outline" className="text-[10px] md:text-xs px-2 py-0.5">{compareStats.totalTrades} trades</Badge>
+                        <div className="text-sm">{compareStats.wins}W / {compareStats.losses}L</div>
+                        <div className="text-sm">{compareStats.bigWins}BW / {compareStats.bigLosses}BL</div>
                       </div>
                     </div>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="grid grid-cols-2 gap-4 w-full">
-                    <div className="flex flex-col gap-2 pt-2 pb-2">
-                      <div className={`text-xs font-semibold ${getWinRateColor(baseStats.wins, baseStats.totalTrades)}`}>WR: {baseStats.totalTrades > 0 ? ((baseStats.wins / baseStats.totalTrades) * 100).toFixed(1) : '0.0'}%</div>
-                      <Badge variant="outline" className="text-[10px] md:text-xs px-2 py-0.5">{baseStats.totalTrades} trades</Badge>
-                      <div className="text-sm">{baseStats.wins}W / {baseStats.losses}L</div>
-                      <div className="text-sm">{baseStats.bigWins}BW / {baseStats.bigLosses}BL</div>
-                    </div>
-                    <div className="flex flex-col gap-2 pt-2 pb-2">
-                      <div className={`text-xs font-semibold ${getWinRateColor(compareStats.wins, compareStats.totalTrades)}`}>WR: {compareStats.totalTrades > 0 ? ((compareStats.wins / compareStats.totalTrades) * 100).toFixed(1) : '0.0'}%</div>
-                      <Badge variant="outline" className="text-[10px] md:text-xs px-2 py-0.5">{compareStats.totalTrades} trades</Badge>
-                      <div className="text-sm">{compareStats.wins}W / {compareStats.losses}L</div>
-                      <div className="text-sm">{compareStats.bigWins}BW / {compareStats.bigLosses}BL</div>
-                    </div>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </div>
-        ) : (
-          // Only show the date, no extra text or padding
-          <></>
-        )}
-      </CardContent>
-    </Card>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </div>
+          ) : (
+            // Only show the date, no extra text or padding
+            <></>
+          )}
+        </CardContent>
+      </Card>
+
+      <CompareTradingDialog
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        baseStats={baseStats}
+        compareStats={compareStats}
+      />
+    </>
   );
 } 

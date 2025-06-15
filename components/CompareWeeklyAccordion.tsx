@@ -70,6 +70,7 @@ export function CompareWeeklyAccordion({ weeks }: CompareWeeklyAccordionProps) {
         end: analysis.sessions?.end || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
       },
       protectionStats: analysis.protectionStats,
+      tradeList: analysis.tradeList || [],
     };
   };
 

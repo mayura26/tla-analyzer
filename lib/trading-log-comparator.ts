@@ -1,22 +1,22 @@
-import { Trade, DailyStats } from './trading-log-parser';
+import { TradeListEntry, DailyStats } from './trading-log-parser';
 
 interface ComparisonResult {
   base: {
-    trades: Trade[];
+    trades: TradeListEntry[];
     dailyStats: DailyStats;
   };
   compare: {
-    trades: Trade[];
+    trades: TradeListEntry[];
     dailyStats: DailyStats;
   };
   differences: {
     trades: {
-      added: Trade[];
-      removed: Trade[];
+      added: TradeListEntry[];
+      removed: TradeListEntry[];
       modified: {
-        trade: Trade;
+        trade: TradeListEntry;
         changes: {
-          field: keyof Trade;
+          field: keyof TradeListEntry;
           oldValue: any;
           newValue: any;
         }[];
@@ -31,8 +31,8 @@ interface ComparisonResult {
 }
 
 export function compareTradingLogs(
-  baseData: { trades: Trade[]; dailyStats: DailyStats },
-  compareData: { trades: Trade[]; dailyStats: DailyStats }
+  baseData: { trades: TradeListEntry[]; dailyStats: DailyStats },
+  compareData: { trades: TradeListEntry[]; dailyStats: DailyStats }
 ): ComparisonResult {
   const result: ComparisonResult = {
     base: baseData,
@@ -58,8 +58,19 @@ export function compareTradingLogs(
       result.differences.trades.added.push(compareTrade);
     } else {
       const changes = [];
-      for (const key of Object.keys(compareTrade) as Array<keyof Trade>) {
-        if (JSON.stringify(compareTrade[key]) !== JSON.stringify(baseTrade[key])) {
+      for (const key of Object.keys(compareTrade) as Array<keyof TradeListEntry>) {
+        if (key === 'subTrades') {
+          // Special handling for sub-trades
+          const baseSubTrades = baseTrade.subTrades || [];
+          const compareSubTrades = compareTrade.subTrades || [];
+          if (JSON.stringify(baseSubTrades) !== JSON.stringify(compareSubTrades)) {
+            changes.push({
+              field: key,
+              oldValue: baseSubTrades,
+              newValue: compareSubTrades,
+            });
+          }
+        } else if (JSON.stringify(compareTrade[key]) !== JSON.stringify(baseTrade[key])) {
           changes.push({
             field: key,
             oldValue: baseTrade[key],
@@ -98,14 +109,14 @@ export function compareTradingLogs(
 }
 
 export function mergeTradingLogs(
-  baseData: { trades: Trade[]; dailyStats: DailyStats },
-  compareData: { trades: Trade[]; dailyStats: DailyStats },
+  baseData: { trades: TradeListEntry[]; dailyStats: DailyStats },
+  compareData: { trades: TradeListEntry[]; dailyStats: DailyStats },
   options: {
     mergeAll?: boolean;
     mergeTradeIds?: number[];
     mergeDailyStats?: boolean;
   }
-): { trades: Trade[]; dailyStats: DailyStats } {
+): { trades: TradeListEntry[]; dailyStats: DailyStats } {
   const result = {
     trades: [...baseData.trades],
     dailyStats: { ...baseData.dailyStats },

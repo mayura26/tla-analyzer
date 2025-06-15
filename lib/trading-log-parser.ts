@@ -80,11 +80,15 @@ export interface TradeListEntry {
   timestamp: Date;
   direction: 'LONG' | 'SHORT';
   entryPrice: number;
-  exitPrice: number;
-  pnl: number;
-  points: number;
   quantity: number;
-  exitReason: 'TP' | 'SL' | 'MANUAL';
+  totalPnl: number;
+  subTrades: {
+    exitPrice: number;
+    quantity: number;
+    pnl: number;
+    points: number;
+    exitReason: 'TP' | 'SL' | 'MANUAL';
+  }[];
   isChaseTrade: boolean;
 }
 
@@ -304,51 +308,84 @@ export function parseTradingLog(logData: string): TradingLogAnalysis {
     const fillMatch = line.match(/\[TRADE FILL \(ID: (\d+)\)\] (LONG|SHORT) FILLED: ([\d.]+)/);
     if (fillMatch && timestamp) {
       const id = parseInt(fillMatch[1]);
-      tradeMap[id] = {
-        ...(tradeMap[id] || {}),
+      const trade: Partial<TradeListEntry> = {
         id,
         timestamp,
         direction: fillMatch[2] as 'LONG' | 'SHORT',
         entryPrice: parseFloat(fillMatch[3]),
+        quantity: 0,
+        totalPnl: 0,
+        subTrades: [],
+        isChaseTrade: false
       };
+      tradeMap[id] = trade;
       continue;
     }
-    // Trade close
+
+    // Trade close (including partial exits)
     const closeMatch = line.match(/\[TRADE CLOSE(?: - (TP|SL))? \(ID: (\d+)\)\] TRADE CLOSED:.*at Price: ([\d.]+)/);
-    if (closeMatch) {
+    if (closeMatch && timestamp) {
       const id = parseInt(closeMatch[2]);
-      if (tradeMap[id]) {
-        tradeMap[id].exitPrice = parseFloat(closeMatch[3]);
-        tradeMap[id].exitReason = (closeMatch[1] || 'MANUAL') as 'TP' | 'SL' | 'MANUAL';
+      const exitReason = (closeMatch[1] || 'MANUAL') as 'TP' | 'SL' | 'MANUAL';
+      const exitPrice = parseFloat(closeMatch[3]);
+      
+      const trade = tradeMap[id];
+      if (trade && trade.subTrades) {
+        // Add a new sub-trade entry
+        trade.subTrades.push({
+          exitPrice,
+          quantity: 0, // Will be set in PnL update
+          pnl: 0, // Will be set in PnL update
+          points: 0, // Will be set in PnL update
+          exitReason
+        });
       }
       continue;
     }
+
     // PnL update
     const pnlMatch = line.match(/\[PNL UPDATE - (GAIN|LOSS|NIL) \(ID: (\d+)\)\] CURRENT TRADE PnL: \$?(-?\d+\.?\d*).*Points : (-?\d+\.?\d*) \| Quantity: (\d+)/);
-    if (pnlMatch) {
+    if (pnlMatch && timestamp) {
       const id = parseInt(pnlMatch[2]);
-      if (tradeMap[id]) {
-        tradeMap[id].pnl = parseFloat(pnlMatch[3]);
-        tradeMap[id].points = parseFloat(pnlMatch[4]);
-        tradeMap[id].quantity = parseInt(pnlMatch[5]);
+      const trade = tradeMap[id];
+      if (trade && trade.subTrades) {
+        const currentPnl = parseFloat(pnlMatch[3]);
+        const currentPoints = parseFloat(pnlMatch[4]);
+        const currentQuantity = parseInt(pnlMatch[5]);
+
+        // Update the latest sub-trade
+        if (trade.subTrades.length > 0) {
+          const lastSubTrade = trade.subTrades[trade.subTrades.length - 1];
+          lastSubTrade.quantity = currentQuantity;
+          lastSubTrade.pnl = currentPnl;
+          lastSubTrade.points = currentPoints;
+        }
+
+        trade.quantity = currentQuantity;
       }
       continue;
     }
+
     // Completed trade
     const completedMatch = line.match(/\[PNL UPDATE - (GAIN|LOSS|NIL) \(ID: (\d+)\)\] COMPLETED TRADE PnL: \$([\d.-]+).*Total PnL: \$([\d.-]+).*\*\*\*\*\*\*/);
     if (completedMatch) {
       const id = parseInt(completedMatch[2]);
-      if (tradeMap[id]) {
-        tradeMap[id].isChaseTrade = line.includes('Chase Trade');
+      const trade = tradeMap[id];
+      if (trade && trade.subTrades) {
+        trade.isChaseTrade = line.includes('Chase Trade');
+        trade.totalPnl = parseFloat(completedMatch[3]);
+        
+        // Calculate total quantity as sum of sub-trade quantities
+        trade.quantity = trade.subTrades.reduce((sum, subTrade) => sum + subTrade.quantity, 0);
+        
         // Only push if we have the required fields
         if (
-          tradeMap[id].id &&
-          tradeMap[id].direction &&
-          tradeMap[id].entryPrice !== undefined &&
-          tradeMap[id].exitPrice !== undefined &&
-          tradeMap[id].pnl !== undefined
+          trade.id &&
+          trade.direction &&
+          trade.entryPrice !== undefined &&
+          trade.subTrades.length > 0
         ) {
-          analysis.tradeList.push(tradeMap[id] as TradeListEntry);
+          analysis.tradeList.push(trade as TradeListEntry);
         }
         delete tradeMap[id];
       }
