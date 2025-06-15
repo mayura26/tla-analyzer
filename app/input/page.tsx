@@ -51,7 +51,7 @@ export default function InputPage() {
               placeholder="Paste your trading log data here..."
               value={logData}
               onChange={(e) => setLogData(e.target.value)}
-              className="min-h-[400px] font-mono"
+              className="h-[400px] font-mono"
             />
             <Button 
               onClick={handleSubmit}

@@ -26,6 +26,14 @@ export interface DailyStats {
   totalPoints: number;
   trailingDrawdown: number;
   contracts: number;
+  bigWins: number;
+  bigLosses: number;
+  maxPotentialGainPerContract: number;
+  pnlPerTrade: number;
+  maxProfit: number;
+  maxRisk: number;
+  maxDailyGain: number;
+  maxDailyLoss: number;
   sessionBreakdown: {
     morning: SessionStats;
     main: SessionStats;
@@ -80,7 +88,9 @@ export interface TradeListEntry {
   isChaseTrade: boolean;
 }
 
-export interface ExpandedDailyStats extends DailyStats {
+export interface ExpandedDailyStats extends Omit<DailyStats, 
+  'bigWins' | 'bigLosses' | 'maxPotentialGainPerContract' | 'pnlPerTrade' | 
+  'maxProfit' | 'maxRisk' | 'maxDailyGain' | 'maxDailyLoss'> {
   bigWins?: number;
   bigLosses?: number;
   maxPotentialGainPerContract?: number;
@@ -193,7 +203,7 @@ export function parseTradingLog(logData: string): TradingLogAnalysis {
       }
     }
     if (line.includes('TOTAL PNL:')) {
-      const match = line.match(/TOTAL PNL: \$(\d+\.?\d*) \| TOTAL POINTS: (\d+\.?\d*) \| Trailing Drawdown: \$(\d+\.?\d*) \| Contracts: (\d+) \| Max Potential Gain per Contract: \$(\d+\.?\d*)/);
+      const match = line.match(/TOTAL PNL: \$(-?\d+\.?\d*) \| TOTAL POINTS: (-?\d+\.?\d*) \| Trailing Drawdown: \$(-?\d+\.?\d*) \| Contracts: (\d+) \| Max Potential Gain per Contract: \$(-?\d+\.?\d*)/);
       if (match) {
         analysis.headline.totalPnl = parseFloat(match[1]);
         analysis.headline.trailingDrawdown = parseFloat(match[3]);
@@ -314,7 +324,7 @@ export function parseTradingLog(logData: string): TradingLogAnalysis {
       continue;
     }
     // PnL update
-    const pnlMatch = line.match(/\[PNL UPDATE - (GAIN|LOSS|NIL) \(ID: (\d+)\)\] CURRENT TRADE PnL: \$([\d.-]+).*Points : ([\d.-]+) \| Quantity: (\d+)/);
+    const pnlMatch = line.match(/\[PNL UPDATE - (GAIN|LOSS|NIL) \(ID: (\d+)\)\] CURRENT TRADE PnL: \$?(-?\d+\.?\d*).*Points : (-?\d+\.?\d*) \| Quantity: (\d+)/);
     if (pnlMatch) {
       const id = parseInt(pnlMatch[2]);
       if (tradeMap[id]) {

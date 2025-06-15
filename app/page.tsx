@@ -1,69 +1,57 @@
-import Link from "next/link";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+"use client";
+
+import { useEffect, useState } from "react";
+import { WeeklyLogAccordion } from "@/components/WeeklyLogAccordion";
+import type { WeekLog } from "@/lib/trading-data-store";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 export default function Home() {
+  const [weeks, setWeeks] = useState<WeekLog[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchWeeks() {
+      const res = await fetch("/api/trading-data/weeks");
+      if (res.ok) {
+        const data = await res.json();
+        setWeeks(data);
+      }
+      setLoading(false);
+    }
+    fetchWeeks();
+  }, []);
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold mb-4">Welcome to TLA Analyzer</h1>
+    <div className="container mx-auto p-4">
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold mb-4">Trading Levels Algo</h1>
         <p className="text-xl text-muted-foreground">
-          Your comprehensive trading log analysis tool
+          Backtested data for the Trading Levels Algo using 5MNQ
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {loading ? (
+        <div>Loading...</div>
+      ) : weeks.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>Input Data</CardTitle>
-            <CardDescription>
-              Upload and parse your trading logs
-            </CardDescription>
+            <CardTitle>No Trading Logs Found</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="mb-4">
-              Start by uploading your trading logs. Our parser will automatically extract and organize your trading data.
+              Start by uploading your trading logs to see your analysis.
             </p>
             <Button asChild>
-              <Link href="/input">Go to Input</Link>
+              <Link href="/input">Upload Trading Logs</Link>
             </Button>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Compare Data</CardTitle>
-            <CardDescription>
-              Compare different trading periods
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="mb-4">
-              Compare trading data across different time periods to identify patterns and improvements.
-            </p>
-            <Button asChild>
-              <Link href="/compare">Go to Compare</Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Dashboard</CardTitle>
-            <CardDescription>
-              View detailed analytics
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="mb-4">
-              Access comprehensive analytics and visualizations of your trading performance.
-            </p>
-            <Button asChild>
-              <Link href="/dashboard">Go to Dashboard</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      ) : (
+        <WeeklyLogAccordion weeks={weeks} />
+      )}
+      <div className="mb-24" />
     </div>
   );
 }

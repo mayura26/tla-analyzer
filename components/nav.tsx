@@ -3,12 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const navItems = [
-  {
-    title: "Home",
-    href: "/",
-  },
   {
     title: "Input Data",
     href: "/input",
@@ -16,10 +13,6 @@ const navItems = [
   {
     title: "Compare",
     href: "/compare",
-  },
-  {
-    title: "Dashboard",
-    href: "/dashboard",
   },
 ];
 
@@ -35,7 +28,7 @@ export function Nav() {
               TLA Analyzer
             </Link>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-6">
             {navItems.map((item) => (
               <Link
                 key={item.href}
@@ -50,6 +43,7 @@ export function Nav() {
                 {item.title}
               </Link>
             ))}
+            <ThemeToggle />
           </div>
         </div>
       </div>
