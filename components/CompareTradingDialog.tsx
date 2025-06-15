@@ -358,6 +358,15 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats 
             </div>
           </div>
         )}
+
+        {comparison.differences.trades.idOnlyChanged.length > 0 && (
+          <div>
+            <div className="text-sm font-medium mb-2 text-muted-foreground">Trades with Only ID Changes</div>
+            <div className="space-y-2 opacity-60">
+              {comparison.differences.trades.idOnlyChanged.map(({ trade, changes }) => renderTrade(trade, true, changes))}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -366,8 +375,17 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats 
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Compare Trading Data</DialogTitle>
+          <DialogTitle>Detailed Comparison</DialogTitle>
         </DialogHeader>
+        {/* Styled header bar for date and PnL diff */}
+        <div className="flex items-center justify-between bg-muted/80 rounded-lg px-6 py-3 mb-4 border border-muted-foreground/10 shadow-sm">
+          <span className="font-semibold text-lg">
+            {baseStats.date ? format(new Date(baseStats.date), 'MMM dd, yyyy (EEE)') : ''}
+          </span>
+          <span className={`font-bold text-lg ${getPnlColor(compareStats.totalPnl - baseStats.totalPnl)}`}> 
+            {formatCurrency(compareStats.totalPnl - baseStats.totalPnl)}
+          </span>
+        </div>
         <Tabs defaultValue="sessions">
           <TabsList>
             <TabsTrigger value="sessions">Sessions</TabsTrigger>

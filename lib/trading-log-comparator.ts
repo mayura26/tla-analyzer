@@ -21,6 +21,14 @@ interface ComparisonResult {
           newValue: any;
         }[];
       }[];
+      idOnlyChanged: {
+        trade: TradeListEntry;
+        changes: {
+          field: keyof TradeListEntry;
+          oldValue: any;
+          newValue: any;
+        }[];
+      }[];
     };
     dailyStats: {
       field: keyof DailyStats;
@@ -42,54 +50,146 @@ export function compareTradingLogs(
         added: [],
         removed: [],
         modified: [],
+        idOnlyChanged: [],
       },
       dailyStats: [],
     },
   };
 
-  // Compare trades
-  const baseTradeMap = new Map(baseData.trades.map(trade => [trade.id, trade]));
-  const compareTradeMap = new Map(compareData.trades.map(trade => [trade.id, trade]));
+  // Composite key generator for trade matching
+  const tradeKey = (trade: TradeListEntry) =>
+    `${new Date(trade.timestamp).toISOString()}|${trade.direction}|${Number(trade.entryPrice).toFixed(2)}|${trade.quantity}`;
 
-  // Find added and modified trades
-  for (const [id, compareTrade] of compareTradeMap) {
-    const baseTrade = baseTradeMap.get(id);
-    if (!baseTrade) {
-      result.differences.trades.added.push(compareTrade);
-    } else {
+  // Build maps by composite key
+  const baseTradeMap = new Map(baseData.trades.map(trade => [tradeKey(trade), trade]));
+  const compareTradeMap = new Map(compareData.trades.map(trade => [tradeKey(trade), trade]));
+
+  // Track which trades have been matched
+  const matchedBaseKeys = new Set<string>();
+  const matchedCompareKeys = new Set<string>();
+
+  // First pass: match by composite key
+  for (const [key, compareTrade] of compareTradeMap) {
+    const baseTrade = baseTradeMap.get(key);
+    if (baseTrade) {
+      matchedBaseKeys.add(key);
+      matchedCompareKeys.add(key);
       const changes = [];
-      for (const key of Object.keys(compareTrade) as Array<keyof TradeListEntry>) {
-        if (key === 'subTrades') {
-          // Special handling for sub-trades
+      for (const k of Object.keys(compareTrade) as Array<keyof TradeListEntry>) {
+        if (k === 'subTrades') {
           const baseSubTrades = baseTrade.subTrades || [];
           const compareSubTrades = compareTrade.subTrades || [];
           if (JSON.stringify(baseSubTrades) !== JSON.stringify(compareSubTrades)) {
             changes.push({
-              field: key,
+              field: k,
               oldValue: baseSubTrades,
               newValue: compareSubTrades,
             });
           }
-        } else if (JSON.stringify(compareTrade[key]) !== JSON.stringify(baseTrade[key])) {
+        } else if (JSON.stringify(compareTrade[k]) !== JSON.stringify(baseTrade[k])) {
           changes.push({
-            field: key,
-            oldValue: baseTrade[key],
-            newValue: compareTrade[key],
+            field: k,
+            oldValue: baseTrade[k],
+            newValue: compareTrade[k],
           });
         }
       }
       if (changes.length > 0) {
-        result.differences.trades.modified.push({
-          trade: compareTrade,
-          changes,
-        });
+        // If the only change is 'id', put in idOnlyChanged
+        if (changes.length === 1 && changes[0].field === 'id') {
+          result.differences.trades.idOnlyChanged.push({
+            trade: compareTrade,
+            changes,
+          });
+        } else {
+          result.differences.trades.modified.push({
+            trade: compareTrade,
+            changes,
+          });
+        }
       }
     }
   }
 
-  // Find removed trades
-  for (const [id, baseTrade] of baseTradeMap) {
-    if (!compareTradeMap.has(id)) {
+  // Second pass: match by fill (sub-trade) timestamp for unmatched trades
+  // Build maps of fill timestamps to trades
+  function getFillTimestamps(trade: TradeListEntry): string[] {
+    return (trade.subTrades || []).map(st => new Date(st.exitPrice ? st.exitPrice : trade.timestamp).toISOString());
+  }
+  const baseFillMap = new Map<string, TradeListEntry>();
+  const compareFillMap = new Map<string, TradeListEntry>();
+  for (const trade of baseData.trades) {
+    if (!matchedBaseKeys.has(tradeKey(trade))) {
+      for (const st of trade.subTrades || []) {
+        baseFillMap.set(new Date(st.exitPrice ? st.exitPrice : trade.timestamp).toISOString(), trade);
+      }
+    }
+  }
+  for (const trade of compareData.trades) {
+    if (!matchedCompareKeys.has(tradeKey(trade))) {
+      for (const st of trade.subTrades || []) {
+        compareFillMap.set(new Date(st.exitPrice ? st.exitPrice : trade.timestamp).toISOString(), trade);
+      }
+    }
+  }
+
+  // Try to match unmatched base and compare trades by any shared fill timestamp
+  const usedCompareTrades = new Set<TradeListEntry>();
+  for (const [fillTs, baseTrade] of baseFillMap) {
+    if (compareFillMap.has(fillTs)) {
+      const compareTrade = compareFillMap.get(fillTs)!;
+      if (!usedCompareTrades.has(compareTrade)) {
+        usedCompareTrades.add(compareTrade);
+        // Compare for modifications
+        const changes = [];
+        for (const k of Object.keys(compareTrade) as Array<keyof TradeListEntry>) {
+          if (k === 'subTrades') {
+            const baseSubTrades = baseTrade.subTrades || [];
+            const compareSubTrades = compareTrade.subTrades || [];
+            if (JSON.stringify(baseSubTrades) !== JSON.stringify(compareSubTrades)) {
+              changes.push({
+                field: k,
+                oldValue: baseSubTrades,
+                newValue: compareSubTrades,
+              });
+            }
+          } else if (JSON.stringify(compareTrade[k]) !== JSON.stringify(baseTrade[k])) {
+            changes.push({
+              field: k,
+              oldValue: baseTrade[k],
+              newValue: compareTrade[k],
+            });
+          }
+        }
+        if (changes.length > 0) {
+          // If the only change is 'id', put in idOnlyChanged
+          if (changes.length === 1 && changes[0].field === 'id') {
+            result.differences.trades.idOnlyChanged.push({
+              trade: compareTrade,
+              changes,
+            });
+          } else {
+            result.differences.trades.modified.push({
+              trade: compareTrade,
+              changes,
+            });
+          }
+        }
+        matchedBaseKeys.add(tradeKey(baseTrade));
+        matchedCompareKeys.add(tradeKey(compareTrade));
+      }
+    }
+  }
+
+  // Find added trades (in compare, not matched)
+  for (const [key, compareTrade] of compareTradeMap) {
+    if (!matchedCompareKeys.has(key)) {
+      result.differences.trades.added.push(compareTrade);
+    }
+  }
+  // Find removed trades (in base, not matched)
+  for (const [key, baseTrade] of baseTradeMap) {
+    if (!matchedBaseKeys.has(key)) {
       result.differences.trades.removed.push(baseTrade);
     }
   }
