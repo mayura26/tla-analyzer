@@ -1,4 +1,4 @@
-import { Trade, DailyStats } from './trading-log-parser';
+import { Trade, DailyStats, TradingLogAnalysis } from './trading-log-parser';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -7,23 +7,35 @@ interface TradingData {
   dailyStats: DailyStats;
 }
 
+export interface DailyLog {
+  date: string; // e.g., '2025-03-10'
+  analysis: TradingLogAnalysis;
+}
+
+export interface WeekLog {
+  weekStart: string; // Monday
+  weekEnd: string;   // Sunday
+  days: DailyLog[];
+  weekHeadline: any; // summary for the week (can be refined)
+}
+
 class TradingDataStore {
   private static instance: TradingDataStore;
-  private baseData: TradingData | null = null;
+  private allDays: DailyLog[] = [];
   private compareData: TradingData | null = null;
   private readonly dataDir: string;
-  private readonly baseDataPath: string;
+  private readonly allDaysPath: string;
 
   private constructor() {
     // In a Next.js app, we need to handle both server and client environments
     if (typeof window === 'undefined') {
       // Server-side
       this.dataDir = path.join(process.cwd(), 'data');
-      this.baseDataPath = path.join(this.dataDir, 'base-data.json');
+      this.allDaysPath = path.join(this.dataDir, 'all-days.json');
     } else {
       // Client-side
       this.dataDir = '/data';
-      this.baseDataPath = '/data/base-data.json';
+      this.allDaysPath = '/data/all-days.json';
     }
   }
 
@@ -48,44 +60,99 @@ class TradingDataStore {
     if (typeof window === 'undefined') {
       try {
         await this.ensureDataDirectory();
-        const data = await fs.readFile(this.baseDataPath, 'utf-8');
-        this.baseData = JSON.parse(data);
+        const data = await fs.readFile(this.allDaysPath, 'utf-8');
+        this.allDays = JSON.parse(data);
       } catch (error) {
-        console.error('Error loading base data:', error);
-        this.baseData = null;
+        console.error('Error loading all days:', error);
+        this.allDays = [];
       }
     } else {
       // Client-side: Use localStorage as fallback
-      const baseDataStr = localStorage.getItem('trading_base_data');
-      if (baseDataStr) {
-        this.baseData = JSON.parse(baseDataStr);
+      const allDaysStr = localStorage.getItem('trading_all_days');
+      if (allDaysStr) {
+        this.allDays = JSON.parse(allDaysStr);
       }
     }
   }
 
   private async saveToStorage() {
-    if (!this.baseData) return;
+    if (!this.allDays) return;
 
     if (typeof window === 'undefined') {
       try {
         await this.ensureDataDirectory();
         await fs.writeFile(
-          this.baseDataPath,
-          JSON.stringify(this.baseData, null, 2),
+          this.allDaysPath,
+          JSON.stringify(this.allDays, null, 2),
           'utf-8'
         );
       } catch (error) {
-        console.error('Error saving base data:', error);
+        console.error('Error saving all days:', error);
       }
     } else {
       // Client-side: Use localStorage as fallback
-      localStorage.setItem('trading_base_data', JSON.stringify(this.baseData));
+      localStorage.setItem('trading_all_days', JSON.stringify(this.allDays));
     }
   }
 
-  async setBaseData(data: TradingData) {
-    this.baseData = data;
+  async addDailyLog(day: DailyLog) {
+    await this.loadFromStorage();
+    // Remove any existing entry for the same date
+    this.allDays = this.allDays.filter(d => d.date !== day.date);
+    this.allDays.push(day);
+    // Sort by date descending
+    this.allDays.sort((a, b) => b.date.localeCompare(a.date));
     await this.saveToStorage();
+  }
+
+  async getAllDays(): Promise<DailyLog[]> {
+    await this.loadFromStorage();
+    return this.allDays;
+  }
+
+  // Group all days into weeks (Monday-Sunday)
+  async groupLogsByWeek(): Promise<WeekLog[]> {
+    await this.loadFromStorage();
+    if (!this.allDays.length) return [];
+    // Helper to get Monday of the week
+    function getWeekStart(dateStr: string) {
+      const d = new Date(dateStr);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
+      const monday = new Date(d.setDate(diff));
+      return monday.toISOString().split('T')[0];
+    }
+    // Group by weekStart
+    const weekMap: Record<string, DailyLog[]> = {};
+    for (const day of this.allDays) {
+      const weekStart = getWeekStart(day.date);
+      if (!weekMap[weekStart]) weekMap[weekStart] = [];
+      weekMap[weekStart].push(day);
+    }
+    // Build WeekLog array
+    const weekLogs: WeekLog[] = Object.entries(weekMap).map(([weekStart, days]) => {
+      // Sort days descending
+      days.sort((a, b) => b.date.localeCompare(a.date));
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      // Compute week headline (sum PnL, trades, wins, etc.)
+      const weekHeadline = days.reduce((acc, d) => {
+        acc.totalPnl = (acc.totalPnl || 0) + (d.analysis.headline.totalPnl || 0);
+        acc.totalTrades = (acc.totalTrades || 0) + (d.analysis.headline.totalTrades || 0);
+        acc.wins = (acc.wins || 0) + (d.analysis.headline.wins || 0);
+        acc.losses = (acc.losses || 0) + (d.analysis.headline.losses || 0);
+        return acc;
+      }, {} as any);
+      return {
+        weekStart,
+        weekEnd: weekEnd.toISOString().split('T')[0],
+        days,
+        weekHeadline,
+      };
+    });
+    // Sort weeks descending
+    weekLogs.sort((a, b) => b.weekStart.localeCompare(a.weekStart));
+    return weekLogs;
   }
 
   setCompareData(data: TradingData) {
@@ -93,10 +160,10 @@ class TradingDataStore {
   }
 
   async getBaseData(): Promise<TradingData | null> {
-    if (!this.baseData) {
+    if (!this.compareData) {
       await this.loadFromStorage();
     }
-    return this.baseData;
+    return this.compareData;
   }
 
   getCompareData(): TradingData | null {
@@ -108,17 +175,17 @@ class TradingDataStore {
     mergeTradeIds?: number[];
     mergeDailyStats?: boolean;
   }): Promise<TradingData> {
-    if (!this.baseData || !this.compareData) {
+    if (!this.compareData) {
       throw new Error('Both base and compare data must be set to perform merge');
     }
 
     const mergedData = {
-      trades: [...this.baseData.trades],
-      dailyStats: { ...this.baseData.dailyStats },
+      trades: [...this.compareData.trades],
+      dailyStats: { ...this.compareData.dailyStats },
     };
 
     if (mergeOptions.mergeAll) {
-      this.baseData = this.compareData;
+      this.compareData = this.compareData;
     } else {
       if (mergeOptions.mergeTradeIds) {
         const compareTradeMap = new Map(this.compareData.trades.map(trade => [trade.id, trade]));
@@ -139,11 +206,11 @@ class TradingDataStore {
         mergedData.dailyStats = this.compareData.dailyStats;
       }
 
-      this.baseData = mergedData;
+      this.compareData = mergedData;
     }
 
     await this.saveToStorage();
-    return this.baseData;
+    return this.compareData;
   }
 
   clearCompareData() {

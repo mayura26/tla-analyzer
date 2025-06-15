@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "sonner";
 
 export default function InputPage() {
   const [logData, setLogData] = useState("");
@@ -12,10 +13,27 @@ export default function InputPage() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      // TODO: Implement data processing and storage
-      console.log("Processing data...");
+      const response = await fetch('/api/trading-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ logData }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to process log data');
+      }
+
+      const result = await response.json();
+      if (result.success) {
+        setLogData('');
+        toast.success("Trading log data has been processed successfully.");
+      }
     } catch (error) {
       console.error("Error processing data:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to process trading log data");
     } finally {
       setIsSubmitting(false);
     }
