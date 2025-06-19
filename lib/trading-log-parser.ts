@@ -82,12 +82,14 @@ export interface TradeListEntry {
   entryPrice: number;
   quantity: number;
   totalPnl: number;
+  exitTimestamp?: Date;
   subTrades: {
     exitPrice: number;
     quantity: number;
     pnl: number;
     points: number;
     exitReason: 'TP' | 'SL' | 'MANUAL';
+    exitTimestamp: Date;
   }[];
   isChaseTrade: boolean;
 }
@@ -337,7 +339,8 @@ export function parseTradingLog(logData: string): TradingLogAnalysis {
           quantity: 0, // Will be set in PnL update
           pnl: 0, // Will be set in PnL update
           points: 0, // Will be set in PnL update
-          exitReason
+          exitReason,
+          exitTimestamp: timestamp
         });
       }
       continue;
@@ -368,12 +371,13 @@ export function parseTradingLog(logData: string): TradingLogAnalysis {
 
     // Completed trade
     const completedMatch = line.match(/\[PNL UPDATE - (GAIN|LOSS|NIL) \(ID: (\d+)\)\] COMPLETED TRADE PnL: \$([\d.-]+).*Total PnL: \$([\d.-]+).*\*\*\*\*\*\*/);
-    if (completedMatch) {
+    if (completedMatch && timestamp) {
       const id = parseInt(completedMatch[2]);
       const trade = tradeMap[id];
       if (trade && trade.subTrades) {
         trade.isChaseTrade = line.includes('Chase Trade');
         trade.totalPnl = parseFloat(completedMatch[3]);
+        trade.exitTimestamp = timestamp;  // Set the final exit timestamp
         
         // Calculate total quantity as sum of sub-trade quantities
         trade.quantity = trade.subTrades.reduce((sum, subTrade) => sum + subTrade.quantity, 0);

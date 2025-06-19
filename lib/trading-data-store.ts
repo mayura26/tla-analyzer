@@ -1,4 +1,4 @@
-import { Trade, DailyStats, TradingLogAnalysis } from './trading-log-parser';
+import { Trade, DailyStats, TradingLogAnalysis, TradeListEntry } from './trading-log-parser';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -51,7 +51,7 @@ interface TradingData {
         restarts: number;
       };
     };
-    tradeList: Trade[];
+    tradeList: TradeListEntry[];
     tradeBreakdown: {
       ordersGenerated: number;
       ordersFilled: number;
@@ -284,10 +284,12 @@ class TradingDataStore {
     if (!allDays.length) return [];
 
     function getWeekStart(dateStr: string) {
-      const d = new Date(dateStr);
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(d.setDate(diff));
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const d = new Date(year, month - 1, day);
+      const dayOfWeek = d.getDay();
+      const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      const monday = new Date(d);
+      monday.setDate(diff);
       return monday.toISOString().split('T')[0];
     }
 

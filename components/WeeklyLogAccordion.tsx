@@ -78,11 +78,17 @@ export function WeeklyLogAccordion({ weeks }: WeeklyLogAccordionProps) {
   return (
     <Accordion type="single" collapsible value={openWeek} onValueChange={setOpenWeek} className="w-full">
       {weeks.map((week) => {
-        // Parse weekStart and weekEnd as local dates
+        // Calculate Monday and Sunday for the week based on weekStart (no timezone conversion)
         let [sy, sm, sd] = week.weekStart.split('-');
         let weekStartDate = new Date(Number(sy), Number(sm) - 1, Number(sd));
-        let [ey, em, ed] = week.weekEnd.split('-');
-        let weekEndDate = new Date(Number(ey), Number(em) - 1, Number(ed));
+        // Get the day of the week (0 = Sunday, 1 = Monday, ... 6 = Saturday)
+        let dayOfWeek = weekStartDate.getDay();
+        // Calculate Monday (if already Monday, stays the same)
+        let monday = new Date(weekStartDate);
+        monday.setDate(weekStartDate.getDate() - ((dayOfWeek + 6) % 7));
+        // Calculate Sunday
+        let sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
         return (
           <AccordionItem key={week.weekStart} value={week.weekStart} className="border rounded-lg mb-4">
             <AccordionTrigger className="px-6 py-4 hover:no-underline">
@@ -90,7 +96,7 @@ export function WeeklyLogAccordion({ weeks }: WeeklyLogAccordionProps) {
                 <div className="flex items-center justify-between w-full">
                   <div className="flex flex-col items-start">
                     <span className="font-bold text-lg">
-                      Week of {format(weekStartDate, 'MMM dd')} - {format(weekEndDate, 'MMM dd, yyyy')}
+                      Week of {format(monday, 'MMM dd')} - {format(sunday, 'MMM dd, yyyy')}
                     </span>
                     <div className="flex items-center gap-4 mt-2">
                       <div className="flex items-center gap-2">

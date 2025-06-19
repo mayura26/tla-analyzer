@@ -1,41 +1,31 @@
-import React from "react";
+import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DailyStats, SessionStats } from "@/lib/trading-log-parser";
+import { DailyStats, SessionStats, TradeListEntry } from "@/lib/trading-log-parser";
 import { format } from "date-fns";
-import { TrendingUp, TrendingDown, Target, DollarSign, ArrowRight, Trophy, AlertTriangle, Plus, Minus } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, DollarSign, ArrowRight, Trophy, AlertTriangle, Plus, Minus, CheckCircle2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { compareTradingLogs } from "@/lib/trading-log-comparator";
-
-interface SubTrade {
-  exitPrice: number;
-  quantity: number;
-  pnl: number;
-  points: number;
-  exitReason: 'TP' | 'SL' | 'MANUAL';
-}
-
-interface TradeListEntry {
-  id: number;
-  timestamp: Date;
-  direction: 'LONG' | 'SHORT';
-  entryPrice: number;
-  quantity: number;
-  totalPnl: number;
-  subTrades: SubTrade[];
-  isChaseTrade: boolean;
-}
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 
 interface CompareTradingDialogProps {
   isOpen: boolean;
   onClose: () => void;
   baseStats: DailyStats & { tradeList?: TradeListEntry[] };
   compareStats: DailyStats & { tradeList?: TradeListEntry[] };
+  onMerge?: () => void;
 }
 
 type SessionKey = keyof DailyStats['sessionBreakdown'];
 
-export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats }: CompareTradingDialogProps) {
+export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats, onMerge }: CompareTradingDialogProps) {
+  const [isVerified, setIsVerified] = useState(false);
+  const [notes, setNotes] = useState("");
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -45,9 +35,15 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats 
     }).format(value);
   };
 
+  const formatTime = (date: Date) => format(date, 'HH:mm');
+
   const formatDifference = (diff: { value: number; percentage: number }) => {
     const sign = diff.value >= 0 ? '+' : '';
     return `${sign}${formatCurrency(diff.value)} (${sign}${diff.percentage.toFixed(1)}%)`;
+  };
+
+  const formatDateDifference = (oldDate: Date, newDate: Date) => {
+    return `${format(oldDate, 'HH:mm')} → ${format(newDate, 'HH:mm')}`;
   };
 
   const getPnlColor = (value: number) => {
@@ -61,7 +57,7 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats 
     return 'text-red-500';
   };
 
-  const getSubTradeDiffs = (oldSubTrades: SubTrade[], newSubTrades: SubTrade[]) => {
+  const getSubTradeDiffs = (oldSubTrades: TradeListEntry['subTrades'][number][], newSubTrades: TradeListEntry['subTrades'][number][], trade: TradeListEntry) => {
     const diffs: React.ReactNode[] = [];
     const maxLen = Math.max(oldSubTrades.length, newSubTrades.length);
     for (let i = 0; i < maxLen; i++) {
@@ -99,7 +95,7 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats 
     return diffs;
   };
 
-  const renderSubTradeComparison = (oldSubTrades: SubTrade[], newSubTrades: SubTrade[]) => {
+  const renderSubTradeComparison = (oldSubTrades: TradeListEntry['subTrades'][number][], newSubTrades: TradeListEntry['subTrades'][number][], trade: TradeListEntry) => {
     const maxLen = Math.max(oldSubTrades.length, newSubTrades.length);
     if (maxLen === 0) return null;
     // Check if there are any differences
@@ -182,7 +178,7 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats 
   };
 
   const renderTrade = (trade: TradeListEntry, isModified = false, changes: { field: keyof TradeListEntry; oldValue: any; newValue: any }[] = []) => {
-    const formatTime = (date: Date) => format(date, 'HH:mm:ss');
+    const formatTime = (date: Date) => format(date, 'HH:mm');
     const isWin = trade.totalPnl > 0;
 
     // Find subTrades change and get detailed diffs if present
@@ -190,12 +186,15 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats 
     let subTradeComparison: React.ReactNode = null;
     const filteredChanges = changes.filter(change => {
       if (change.field === 'subTrades') {
-        subTradeComparison = renderSubTradeComparison(change.oldValue, change.newValue);
+        subTradeComparison = renderSubTradeComparison(change.oldValue, change.newValue, trade);
         // Only keep this change if there are actual diffs
         return false;
       }
       return true;
     });
+
+    // Find PnL change if it exists
+    const pnlChange = changes.find(change => change.field === 'totalPnl');
 
     return (
       <div className={`p-3 rounded-lg ${isModified ? 'bg-muted/50' : 'bg-muted/30'}`}>
@@ -217,8 +216,35 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats 
             )}
           </div>
           <div className="flex items-center gap-2">
-            <span className={`font-medium ${getPnlColor(trade.totalPnl)}`}>{formatCurrency(trade.totalPnl)}</span>
-            <Badge variant="outline" className="text-xs">{trade.quantity} @ {trade.entryPrice}</Badge>
+            {isModified && pnlChange ? (
+              <div className="flex items-center gap-1">
+                <Badge 
+                  variant="outline" 
+                  className={`${
+                    pnlChange.newValue - pnlChange.oldValue >= 0 
+                      ? 'bg-green-400/20 text-green-400 border-green-400/30' 
+                      : 'bg-red-400/20 text-red-400 border-red-400/30'
+                  }`}
+                >
+                  {formatCurrency(pnlChange.newValue - pnlChange.oldValue)}
+                </Badge>
+                <span className="text-muted-foreground text-sm">
+                  ({formatCurrency(pnlChange.oldValue)} → {formatCurrency(pnlChange.newValue)})
+                </span>
+              </div>
+            ) : (
+              <Badge 
+                variant="outline" 
+                className={`${
+                  trade.totalPnl >= 0 
+                    ? 'bg-green-400/20 text-green-400 border-green-400/30' 
+                    : 'bg-red-400/20 text-red-400 border-red-400/30'
+                }`}
+              >
+                {formatCurrency(trade.totalPnl)}
+              </Badge>
+            )}
+            <Badge variant="outline" className="text-xs">{trade.entryPrice}</Badge>
           </div>
         </div>
 
@@ -252,14 +278,41 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats 
           <div className="mt-2 pt-2 border-t">
             <div className="text-xs text-muted-foreground">Changes:</div>
             <div className="grid grid-cols-2 gap-2 mt-1">
-              {filteredChanges.map((change, index) => (
-                <div key={index} className="text-xs">
-                  <span className="text-muted-foreground">{change.field}:</span>
-                  <span className="ml-1 line-through">{String(change.oldValue)}</span>
-                  <ArrowRight className="w-3 h-3 inline mx-1" />
-                  <span className={getPnlColor(change.newValue)}>{String(change.newValue)}</span>
-                </div>
-              ))}
+              {filteredChanges.map((change, index) => {
+                // Helper to check if a value is a date or date string
+                const isDateLike = (val: any) => {
+                  if (val instanceof Date) return true;
+                  if (typeof val === 'string') {
+                    const d = new Date(val);
+                    return !isNaN(d.getTime());
+                  }
+                  return false;
+                };
+                const formatToTime = (val: any) => {
+                  if (val instanceof Date) return format(val, 'HH:mm');
+                  if (typeof val === 'string') {
+                    const d = new Date(val);
+                    if (!isNaN(d.getTime())) return format(d, 'HH:mm');
+                  }
+                  return String(val);
+                };
+                return (
+                  <div key={index} className="text-xs">
+                    <span className="text-muted-foreground">{change.field}:</span>
+                    <span className="ml-1 line-through">
+                      {isDateLike(change.oldValue)
+                        ? formatToTime(change.oldValue)
+                        : String(change.oldValue)}
+                    </span>
+                    <ArrowRight className="w-3 h-3 inline mx-1" />
+                    <span className={getPnlColor(change.newValue)}>
+                      {isDateLike(change.newValue)
+                        ? formatToTime(change.newValue)
+                        : String(change.newValue)}
+                    </span>
+                  </div>
+                );
+              })}
               {subTradeComparison}
             </div>
           </div>
@@ -371,6 +424,50 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats 
     );
   };
 
+  const renderManageTab = () => {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>Day Verification</Label>
+            <div className="text-sm text-muted-foreground">
+              Mark this day as verified after reviewing the changes
+            </div>
+          </div>
+          <Switch
+            checked={isVerified}
+            onCheckedChange={setIsVerified}
+          />
+        </div>
+
+        <Separator />
+
+        <div className="space-y-2">
+          <Label>Notes</Label>
+          <Textarea
+            placeholder="Add any notes about the changes or verification..."
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="min-h-[100px]"
+          />
+        </div>
+
+        <Separator />
+
+        <div className="flex justify-end">
+          <Button
+            onClick={onMerge}
+            className="gap-2"
+            disabled={!isVerified}
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            Merge Changes
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -390,12 +487,16 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats 
           <TabsList>
             <TabsTrigger value="sessions">Sessions</TabsTrigger>
             <TabsTrigger value="trades">Trades</TabsTrigger>
+            <TabsTrigger value="manage">Manage</TabsTrigger>
           </TabsList>
           <TabsContent value="sessions" className="mt-4">
             {renderSessionComparison()}
           </TabsContent>
           <TabsContent value="trades" className="mt-4">
             {renderTradeComparison()}
+          </TabsContent>
+          <TabsContent value="manage" className="mt-4">
+            {renderManageTab()}
           </TabsContent>
         </Tabs>
       </DialogContent>

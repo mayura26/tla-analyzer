@@ -93,11 +93,14 @@ export function CompareWeeklyAccordion({ weeks }: CompareWeeklyAccordionProps) {
   return (
     <Accordion type="single" collapsible value={openWeek} onValueChange={setOpenWeek} className="w-full">
       {weeks.map((week: any) => {
-        // Parse weekStart and weekEnd as local dates
+        // Calculate Monday and Sunday for the week based on weekStart (no timezone conversion)
         let [sy, sm, sd] = week.weekStart.split('-');
         let weekStartDate = new Date(Number(sy), Number(sm) - 1, Number(sd));
-        let [ey, em, ed] = week.weekEnd.split('-');
-        let weekEndDate = new Date(Number(ey), Number(em) - 1, Number(ed));
+        let dayOfWeek = weekStartDate.getDay();
+        let monday = new Date(weekStartDate);
+        monday.setDate(weekStartDate.getDate() - ((dayOfWeek + 6) % 7));
+        let sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
 
         // Calculate diffs for the week
         const diff = {
@@ -140,7 +143,7 @@ export function CompareWeeklyAccordion({ weeks }: CompareWeeklyAccordionProps) {
                 <div className="flex items-center justify-between w-full">
                   <div className="flex flex-col items-start">
                     <span className="font-bold text-lg">
-                      Week of {format(weekStartDate, 'MMM dd')} - {format(weekEndDate, 'MMM dd, yyyy')}
+                      Week of {format(monday, 'MMM dd')} - {format(sunday, 'MMM dd, yyyy')}
                     </span>
                     {diff.hasChanges && (
                       <div className="flex items-center gap-4 mt-2">
