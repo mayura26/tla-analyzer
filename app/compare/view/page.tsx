@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, ChevronDown, ChevronUp, DollarSign, Target, TrendingUp, TrendingDown } from "lucide-react";
 import { ComparisonStats } from "@/lib/trading-comparison-stats-processor";
+import { toast } from "sonner";
 
 export default function CompareViewPage() {
   const [weeks, setWeeks] = useState<any[]>([]);
@@ -16,40 +17,53 @@ export default function CompareViewPage() {
   const [error, setError] = useState<string | null>(null);
   const [statsExpanded, setStatsExpanded] = useState(false);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [weeksRes, statsRes] = await Promise.all([
-          fetch("/api/trading-data/compare"),
-          fetch("/api/trading-data/compare/stats")
-        ]);
+  const fetchData = async () => {
+    try {
+      const [weeksRes, statsRes] = await Promise.all([
+        fetch("/api/trading-data/compare"),
+        fetch("/api/trading-data/compare/stats")
+      ]);
 
-        if (!weeksRes.ok) {
-          throw new Error(`Failed to fetch comparison data: ${weeksRes.statusText}`);
-        }
-        if (!statsRes.ok) {
-          throw new Error(`Failed to fetch comparison stats: ${statsRes.statusText}`);
-        }
-
-        const [weeksData, statsData] = await Promise.all([
-          weeksRes.json(),
-          statsRes.json()
-        ]);
-
-        if (!Array.isArray(weeksData)) {
-          throw new Error("Invalid weeks data format received");
-        }
-
-        setWeeks(weeksData);
-        setStats(statsData);
-      } catch (error) {
-        setError(error instanceof Error ? error.message : "Failed to load comparison data");
-      } finally {
-        setLoading(false);
+      if (!weeksRes.ok) {
+        throw new Error(`Failed to fetch comparison data: ${weeksRes.statusText}`);
       }
+      if (!statsRes.ok) {
+        throw new Error(`Failed to fetch comparison stats: ${statsRes.statusText}`);
+      }
+
+      const [weeksData, statsData] = await Promise.all([
+        weeksRes.json(),
+        statsRes.json()
+      ]);
+
+      if (!Array.isArray(weeksData)) {
+        throw new Error("Invalid weeks data format received");
+      }
+
+      setWeeks(weeksData);
+      setStats(statsData);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to load comparison data");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
     fetchData();
   }, []);
+
+  const handleWeekMerged = async (weekStart: string) => {
+    // Refresh the data after a week is merged
+    setLoading(true);
+    try {
+      await fetchData();
+    } catch (error) {
+      toast.error('Failed to refresh data', {
+        description: 'There was an error refreshing the comparison data.'
+      });
+    }
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -445,7 +459,7 @@ export default function CompareViewPage() {
             )}
           </Card>
 
-          <CompareWeeklyAccordion weeks={weeks} />
+          <CompareWeeklyAccordion weeks={weeks} onWeekMerged={handleWeekMerged} />
         </>
       )}
       <div className="mb-24" />

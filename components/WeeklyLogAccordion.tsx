@@ -10,9 +10,11 @@ import { TrendingUp, TrendingDown, Target, DollarSign } from "lucide-react";
 
 interface WeeklyLogAccordionProps {
   weeks: WeekLog[];
+  notesData: Record<string, string>;
+  onNotesChange?: (date: string, notes: string) => void;
 }
 
-export function WeeklyLogAccordion({ weeks }: WeeklyLogAccordionProps) {
+export function WeeklyLogAccordion({ weeks, notesData, onNotesChange }: WeeklyLogAccordionProps) {
   const [openWeek, setOpenWeek] = useState(weeks.length > 0 ? weeks[0].weekStart : "");
 
   const formatCurrency = (value: number) => {
@@ -134,7 +136,7 @@ export function WeeklyLogAccordion({ weeks }: WeeklyLogAccordionProps) {
                     return dateA.getTime() - dateB.getTime();
                   })
                   .map((day) => (
-                  <TradingCard key={day.date} stats={transformToDailyStats(day)} />
+                  <TradingCard key={day.date} stats={transformToDailyStats(day)} notes={notesData[day.date] || ""} onNotesChange={onNotesChange} />
                 ))}
               </div>
             </AccordionContent>

@@ -4,20 +4,24 @@ import { DailyStats } from "@/lib/trading-log-parser";
 import { format } from "date-fns";
 import { TrendingUp, TrendingDown, Target, DollarSign, ArrowRight, Trophy, AlertTriangle, CheckCircle2, FileText } from "lucide-react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { CompareTradingDialog } from "./CompareTradingDialog";
 
 interface CompareTradingCardProps {
   baseStats: DailyStats;
   compareStats: DailyStats;
+  metadata?: {
+    verified?: boolean;
+    notes?: string;
+    verifiedAt?: string;
+    verifiedBy?: string;
+  } | null;
 }
 
-export function CompareTradingCard({ baseStats, compareStats }: CompareTradingCardProps) {
+export function CompareTradingCard({ baseStats, compareStats, metadata }: CompareTradingCardProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isVerified, setIsVerified] = useState(false);
-  const [isLoadingVerification, setIsLoadingVerification] = useState(false);
-  const [notes, setNotes] = useState<string>("");
-  const [isLoadingNotes, setIsLoadingNotes] = useState(false);
+  const [isVerified, setIsVerified] = useState(metadata?.verified || false);
+  const [notes, setNotes] = useState<string>(metadata?.notes || "");
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -93,46 +97,6 @@ export function CompareTradingCard({ baseStats, compareStats }: CompareTradingCa
   const mutedTitleClass = !hasChanges ? "text-base text-muted-foreground font-medium text-center w-full" : "";
   const mutedContentClass = !hasChanges ? "py-1 px-2" : "";
 
-  // Helper function to ensure date is in YYYY-MM-DD format
-  const getFormattedDate = (dateInput: string | Date): string => {
-    if (typeof dateInput === 'string') {
-      // If it's already a YYYY-MM-DD string, return it
-      if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
-        return dateInput;
-      }
-      // If it's a date string, parse it
-      const date = new Date(dateInput);
-      return format(date, 'yyyy-MM-dd');
-    } else {
-      // If it's a Date object
-      return format(dateInput, 'yyyy-MM-dd');
-    }
-  };
-
-  // Load verification status and notes when component mounts
-  useEffect(() => {
-    const loadVerificationStatus = async () => {
-      try {
-        setIsLoadingVerification(true);
-        setIsLoadingNotes(true);
-        const formattedDate = getFormattedDate(baseStats.date);
-        const response = await fetch(`/api/trading-data/compare/manage?date=${formattedDate}`);
-        if (response.ok) {
-          const data = await response.json();
-          setIsVerified(data.metadata?.verified || false);
-          setNotes(data.metadata?.notes || "");
-        }
-      } catch (error) {
-        console.error('Error loading verification status:', error);
-      } finally {
-        setIsLoadingVerification(false);
-        setIsLoadingNotes(false);
-      }
-    };
-
-    loadVerificationStatus();
-  }, [baseStats.date]);
-
   const handleNotesChange = (newNotes: string) => {
     setNotes(newNotes);
   };
@@ -157,11 +121,6 @@ export function CompareTradingCard({ baseStats, compareStats }: CompareTradingCa
         {isVerified && (
           <div className="absolute top-2 right-2 z-10" title="This day has been verified">
             <CheckCircle2 className="w-5 h-5 text-green-500" />
-          </div>
-        )}
-        {isLoadingVerification && (
-          <div className="absolute top-2 right-2 z-10">
-            <div className="w-5 h-5 border-2 border-gray-300 border-t-green-500 rounded-full animate-spin bg-white shadow-sm" />
           </div>
         )}
         
@@ -246,9 +205,6 @@ export function CompareTradingCard({ baseStats, compareStats }: CompareTradingCa
                       <div className="flex items-center gap-2 w-full">
                         <FileText className="w-4 h-4 text-muted-foreground" />
                         <span className="text-sm font-medium">Notes</span>
-                        {isLoadingNotes && (
-                          <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" />
-                        )}
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>

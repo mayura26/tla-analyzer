@@ -2,14 +2,95 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { DailyStats, SessionStats } from "@/lib/trading-log-parser"
 import { format, isAfter, isBefore, parse } from "date-fns"
-import { ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, DollarSign, Percent, Target, AlertTriangle, ChevronDown } from "lucide-react"
+import { ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, DollarSign, Percent, Target, AlertTriangle, ChevronDown, FileText, Loader2 } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Separator } from "@/components/ui/separator"
+import { useState, useEffect } from "react"
+import { toast } from "sonner"
 
 interface TradingCardProps {
   stats: DailyStats
+  notes?: string
+  onNotesChange?: (date: string, notes: string) => void
 }
 
-export function TradingCard({ stats }: TradingCardProps) {
+export function TradingCard({ stats, notes: initialNotes = "", onNotesChange }: TradingCardProps) {
+  const [notes, setNotes] = useState(initialNotes)
+  const [isSaving, setIsSaving] = useState(false)
+  const [hasUnsavedNotes, setHasUnsavedNotes] = useState(false)
+
+  // Update notes when prop changes
+  useEffect(() => {
+    setNotes(initialNotes);
+    setHasUnsavedNotes(false);
+  }, [initialNotes]);
+
+  // Helper function to ensure date is in YYYY-MM-DD format
+  const getFormattedDate = (dateInput: string | Date): string => {
+    if (typeof dateInput === 'string') {
+      // If it's already a YYYY-MM-DD string, return it
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+        return dateInput;
+      }
+      // If it's a date string, parse it
+      const date = new Date(dateInput);
+      return format(date, 'yyyy-MM-dd');
+    } else {
+      // If it's a Date object
+      return format(dateInput, 'yyyy-MM-dd');
+    }
+  };
+
+  const saveNotes = async (newNotes: string) => {
+    try {
+      setIsSaving(true);
+      const formattedDate = getFormattedDate(stats.date);
+      const response = await fetch('/api/trading-data/notes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          date: formattedDate,
+          notes: newNotes
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          toast.success("Notes saved successfully");
+          if (onNotesChange) {
+            onNotesChange(formattedDate, newNotes);
+          }
+        } else {
+          toast.error(data.error || "Failed to save notes");
+        }
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to save notes");
+      }
+    } catch (error) {
+      console.error('Error saving notes:', error);
+      toast.error("Failed to save notes");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleNotesChange = (newNotes: string) => {
+    setNotes(newNotes);
+    setHasUnsavedNotes(true);
+  };
+
+  const handleSaveNotes = async () => {
+    await saveNotes(notes);
+    setHasUnsavedNotes(false);
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -294,6 +375,59 @@ export function TradingCard({ stats }: TradingCardProps) {
                       {stats.protectionStats.chaseMode.restarts}
                     </Badge>
                   </div>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="notes">
+            <AccordionTrigger className="hover:no-underline">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                <span className="font-medium">Notes</span>
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-2 pb-2">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Trading Day Notes</Label>
+                  <Textarea
+                    id="notes"
+                    placeholder="Add any notes about this trading day..."
+                    value={notes}
+                    onChange={(e) => handleNotesChange(e.target.value)}
+                    className="min-h-[100px] resize-none"
+                    disabled={isSaving}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  {isSaving && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Saving notes...
+                    </div>
+                  )}
+                  {hasUnsavedNotes && !isSaving && (
+                    <div className="text-sm text-muted-foreground">
+                      You have unsaved changes
+                    </div>
+                  )}
+                  <Button
+                    onClick={handleSaveNotes}
+                    disabled={!hasUnsavedNotes || isSaving}
+                    size="sm"
+                    className="ml-auto"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Notes"
+                    )}
+                  </Button>
                 </div>
               </div>
             </AccordionContent>

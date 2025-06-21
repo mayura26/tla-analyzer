@@ -35,9 +35,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { action, date, notes, verifiedBy, verified } = await request.json();
-    
-    console.log('POST /api/trading-data/compare/manage - Received:', { action, date, notes, verifiedBy, verified });
-    
+        
     if (!action || !date) {
       return NextResponse.json(
         { error: 'Action and date are required' },

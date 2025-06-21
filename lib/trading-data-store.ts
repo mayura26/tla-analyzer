@@ -2,6 +2,12 @@ import { Trade, DailyStats, TradingLogAnalysis, TradeListEntry } from './trading
 import fs from 'fs/promises';
 import path from 'path';
 
+export interface NotesData {
+  date: string;
+  notes: string;
+  lastModified: string;
+}
+
 interface TradingData {
   date: string;
   analysis: {
@@ -475,17 +481,28 @@ class TradingDataStore {
     await this.loadFromStorage('compare');
     const compareData = this.endpoints.compare.data;
     
-    // Calculate the week range
+    // Calculate the week range using date strings to avoid timezone issues
     const [year, month, day] = weekStart.split('-').map(Number);
-    const weekStartDate = new Date(year, month - 1, day);
-    const weekEndDate = new Date(weekStartDate);
-    weekEndDate.setDate(weekStartDate.getDate() + 6);
     
-    // Find all compare data within the week range
-    const weekCompareData = compareData.filter(d => {
-      const dayDate = new Date(d.date);
-      return dayDate >= weekStartDate && dayDate <= weekEndDate;
-    });
+    // Create a temporary date object just for calculating the week boundaries
+    // Use UTC to avoid timezone issues
+    const weekStartDate = new Date(Date.UTC(year, month - 1, day));
+    const dayOfWeek = weekStartDate.getUTCDay();
+    
+    // Calculate Monday of the week
+    const mondayOffset = (dayOfWeek + 6) % 7; // Days to subtract to get to Monday
+    const mondayDate = new Date(Date.UTC(year, month - 1, day - mondayOffset));
+    
+    // Generate all 7 days of the week as YYYY-MM-DD strings
+    const weekDays: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const currentDate = new Date(Date.UTC(mondayDate.getUTCFullYear(), mondayDate.getUTCMonth(), mondayDate.getUTCDate() + i));
+      const dateString = currentDate.toISOString().split('T')[0];
+      weekDays.push(dateString);
+    }
+    
+    // Find all compare data for the exact week days
+    const weekCompareData = compareData.filter(d => weekDays.includes(d.date));
     
     if (weekCompareData.length === 0) {
       return false;
@@ -501,10 +518,7 @@ class TradingDataStore {
     }
 
     // Remove all compare data for this week after successful merge
-    const updatedCompareData = compareData.filter(d => {
-      const dayDate = new Date(d.date);
-      return !(dayDate >= weekStartDate && dayDate <= weekEndDate);
-    });
+    const updatedCompareData = compareData.filter(d => !weekDays.includes(d.date));
     
     this.endpoints.compare.data = updatedCompareData;
     await this.saveToStorage('compare');

@@ -6,12 +6,14 @@ import { Button } from "@/components/ui/button";
 import { CompareTradingCard } from "@/components/CompareTradingCard";
 import { format } from "date-fns";
 import { TrendingUp, TrendingDown, Target, DollarSign, GitMerge } from "lucide-react";
+import { toast } from "sonner";
 
 interface CompareWeeklyAccordionProps {
   weeks: any[];
+  onWeekMerged?: (weekStart: string) => void;
 }
 
-export function CompareWeeklyAccordion({ weeks }: CompareWeeklyAccordionProps) {
+export function CompareWeeklyAccordion({ weeks, onWeekMerged }: CompareWeeklyAccordionProps) {
   const [openWeek, setOpenWeek] = useState(weeks.length > 0 ? weeks[0].weekStart : "");
   const [mergeLoading, setMergeLoading] = useState<Record<string, boolean>>({});
 
@@ -110,15 +112,25 @@ export function CompareWeeklyAccordion({ weeks }: CompareWeeklyAccordionProps) {
       const result = await response.json();
       
       if (result.success) {
-        // Optionally refresh the page or update the UI
-        window.location.reload();
+        // Call the callback to notify parent component
+        if (onWeekMerged) {
+          onWeekMerged(weekStart);
+        }
+        // Show success toast
+        toast.success('Week merged successfully!', {
+          description: result.message || 'All compare data for the week has been merged to base data.'
+        });
       } else {
         console.error('Merge failed:', result.error);
-        alert('Failed to merge week data: ' + result.error);
+        toast.error('Failed to merge week data', {
+          description: result.error
+        });
       }
     } catch (error) {
       console.error('Error merging week:', error);
-      alert('Error merging week data');
+      toast.error('Error merging week data', {
+        description: 'An unexpected error occurred while merging the week data.'
+      });
     } finally {
       setMergeLoading(prev => ({ ...prev, [weekStart]: false }));
     }
@@ -155,14 +167,18 @@ export function CompareWeeklyAccordion({ weeks }: CompareWeeklyAccordionProps) {
         week.days.forEach((day: any) => {
           const baseStats = day.baseAnalysis ? transformToDailyStats(day.baseAnalysis, day.date) : null;
           const compareStats = day.compareAnalysis ? transformToDailyStats(day.compareAnalysis, day.date) : null;
-          if (!baseStats || !compareStats) return;
-          const pnlDiff = (compareStats.totalPnl ?? 0) - (baseStats.totalPnl ?? 0);
-          const tradesDiff = (compareStats.totalTrades ?? 0) - (baseStats.totalTrades ?? 0);
-          const winsDiff = (compareStats.wins ?? 0) - (baseStats.wins ?? 0);
-          const lossesDiff = (compareStats.losses ?? 0) - (baseStats.losses ?? 0);
-          const bigWinDiff = (compareStats.bigWins ?? 0) - (baseStats.bigWins ?? 0);
-          const bigLossDiff = (compareStats.bigLosses ?? 0) - (baseStats.bigLosses ?? 0);
+          
+          if (!baseStats && !compareStats) return;
+
+          const pnlDiff = (compareStats?.totalPnl ?? 0) - (baseStats?.totalPnl ?? 0);
+          const tradesDiff = (compareStats?.totalTrades ?? 0) - (baseStats?.totalTrades ?? 0);
+          const winsDiff = (compareStats?.wins ?? 0) - (baseStats?.wins ?? 0);
+          const lossesDiff = (compareStats?.losses ?? 0) - (baseStats?.losses ?? 0);
+          const bigWinDiff = (compareStats?.bigWins ?? 0) - (baseStats?.bigWins ?? 0);
+          const bigLossDiff = (compareStats?.bigLosses ?? 0) - (baseStats?.bigLosses ?? 0);
+          
           const hasChanges = pnlDiff !== 0 || tradesDiff !== 0 || winsDiff !== 0 || lossesDiff !== 0 || bigWinDiff !== 0 || bigLossDiff !== 0;
+
           if (hasChanges) {
             daysWithDiffs.push(day);
           } else {
@@ -199,24 +215,28 @@ export function CompareWeeklyAccordion({ weeks }: CompareWeeklyAccordionProps) {
                       </div>
                     )}
                   </div>
-                  {diff.hasChanges && (
-                    <div className="flex items-center gap-2">
-                      {getPnlIcon(diff.pnlDiff)}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
+                  <div className="flex items-center gap-2">
+                    {diff.hasChanges && getPnlIcon(diff.pnlDiff)}
+                    <div
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 ml-2 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        mergeWeek(week.weekStart);
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
                           e.stopPropagation();
+                          e.preventDefault();
                           mergeWeek(week.weekStart);
-                        }}
-                        disabled={mergeLoading[week.weekStart]}
-                        className="ml-2"
-                      >
-                        <GitMerge className="w-4 h-4 mr-1" />
-                        {mergeLoading[week.weekStart] ? 'Merging...' : 'Merge Week'}
-                      </Button>
+                        }
+                      }}
+                    >
+                      <GitMerge className="w-4 h-4 mr-1" />
+                      {mergeLoading[week.weekStart] ? 'Merging...' : 'Merge Week'}
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             </AccordionTrigger>
@@ -235,6 +255,7 @@ export function CompareWeeklyAccordion({ weeks }: CompareWeeklyAccordionProps) {
                           key={day.date}
                           baseStats={baseStats}
                           compareStats={compareStats}
+                          metadata={day.metadata}
                         />
                       );
                     })}
@@ -256,6 +277,7 @@ export function CompareWeeklyAccordion({ weeks }: CompareWeeklyAccordionProps) {
                             key={day.date}
                             baseStats={baseStats}
                             compareStats={compareStats}
+                            metadata={day.metadata}
                           />
                         );
                       })}

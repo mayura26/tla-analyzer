@@ -504,16 +504,6 @@ export default function Home() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Trading Overview */}
-      <Card className="bg-card/50">
-        <CardHeader className="p-2">
-          <CardTitle className="text-base">Trading Overview</CardTitle>
-        </CardHeader>
-        <CardContent className="p-2">
-          <WeeklyLogAccordion weeklyLogs={weeklyGroupedLogs} />
-        </CardContent>
-      </Card>
     </main>
   )
 }

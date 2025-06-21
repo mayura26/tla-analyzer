@@ -62,7 +62,9 @@ export async function GET() {
         return {
           date,
           compareAnalysis: compareDay ? compareDay.analysis : null,
-          baseAnalysis: baseDay ? baseDay.analysis : null
+          baseAnalysis: baseDay ? baseDay.analysis : null,
+          // Include metadata from compare data
+          metadata: compareDay ? compareDay.metadata : null
         };
       });
       // Calculate weekHeadline for compare and base
@@ -86,7 +88,8 @@ export async function GET() {
         days: days.map(d => ({
           date: d.date,
           compareAnalysis: d.compareAnalysis,
-          baseAnalysis: d.baseAnalysis
+          baseAnalysis: d.baseAnalysis,
+          metadata: d.metadata
         })),
         compareHeadline,
         baseHeadline
