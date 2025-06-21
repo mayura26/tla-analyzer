@@ -113,9 +113,6 @@ export function compareTradingLogs(
 
   // Second pass: match by fill (sub-trade) timestamp for unmatched trades
   // Build maps of fill timestamps to trades
-  function getFillTimestamps(trade: TradeListEntry): string[] {
-    return (trade.subTrades || []).map(st => new Date(st.exitPrice ? st.exitPrice : trade.timestamp).toISOString());
-  }
   const baseFillMap = new Map<string, TradeListEntry>();
   const compareFillMap = new Map<string, TradeListEntry>();
   for (const trade of baseData.trades) {

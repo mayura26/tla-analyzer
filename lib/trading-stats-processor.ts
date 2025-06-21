@@ -194,8 +194,8 @@ export class TradingStatsProcessor {
     let bigLosses = 0;
     let greenDays = 0;
     let redDays = 0;
-    let maxWinDays: { date: string; pnl: number; trades: number }[] = [];
-    let maxLossDays: { date: string; pnl: number; trades: number }[] = [];
+    const maxWinDays: { date: string; pnl: number; trades: number }[] = [];
+    const maxLossDays: { date: string; pnl: number; trades: number }[] = [];
     let highProfitDays = 0;
     let lowProfitDays = 0;
     let lowLossDays = 0;

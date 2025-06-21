@@ -1,13 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { DailyStats, SessionStats } from "@/lib/trading-log-parser"
+import { DailyStats } from "@/lib/trading-log-parser"
 import { format, isAfter, isBefore, parse } from "date-fns"
-import { ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, DollarSign, Percent, Target, AlertTriangle, ChevronDown, FileText, Loader2 } from "lucide-react"
+import { ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, Target, AlertTriangle, FileText, Loader2 } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
 
@@ -138,42 +137,6 @@ export function TradingCard({ stats, notes: initialNotes = "", onNotesChange }: 
     return 'text-red-500'
   }
 
-  const getSessionCategory = (time: string) => {
-    const tradeTime = parse(time, 'HH:mm', new Date())
-    const morningStart = parse('08:40', 'HH:mm', new Date())
-    const morningEnd = parse('10:00', 'HH:mm', new Date())
-    const mainEnd = parse('16:00', 'HH:mm', new Date())
-    const middayEnd = parse('12:45', 'HH:mm', new Date())
-    const endSessionStart = parse('15:25', 'HH:mm', new Date())
-
-    if (isAfter(tradeTime, endSessionStart)) return 'End'
-    if (isBefore(tradeTime, morningEnd) && isAfter(tradeTime, morningStart)) return 'Morning'
-    if (isBefore(tradeTime, mainEnd) && isAfter(tradeTime, morningEnd)) {
-      if (isBefore(tradeTime, middayEnd)) return 'Midday'
-      return 'Afternoon'
-    }
-    return 'Other'
-  }
-
-  const categorizeSessions = (sessionData: Record<string, { pnl: number; trades: number }>) => {
-    const categorized: Record<string, { pnl: number; trades: number }> = {
-      'Morning': { pnl: 0, trades: 0 },
-      'Midday': { pnl: 0, trades: 0 },
-      'Afternoon': { pnl: 0, trades: 0 },
-      'End': { pnl: 0, trades: 0 }
-    }
-
-    Object.entries(sessionData).forEach(([time, data]) => {
-      const category = getSessionCategory(time)
-      if (categorized[category]) {
-        categorized[category].pnl += data.pnl
-        categorized[category].trades += data.trades
-      }
-    })
-
-    return categorized
-  }
-
   return (
     <Card className="w-full max-w-full md:max-w-md lg:max-w-lg hover:shadow-lg transition-shadow duration-200">
       <CardHeader className="border-b pb-4">
@@ -295,7 +258,7 @@ export function TradingCard({ stats, notes: initialNotes = "", onNotesChange }: 
                       </Badge>
                     </div>
                   </div>
-                  
+
                   {/* Midday Subset */}
                   <div className="flex flex-wrap justify-between items-center p-2 md:p-3 bg-muted/20 rounded-lg min-w-0 ml-4">
                     <span className="text-xs md:text-sm font-medium capitalize min-w-0 truncate">Midday</span>
@@ -400,7 +363,7 @@ export function TradingCard({ stats, notes: initialNotes = "", onNotesChange }: 
                     disabled={isSaving}
                   />
                 </div>
-                
+
                 <div className="flex items-center justify-between">
                   {isSaving && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">

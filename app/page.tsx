@@ -1,6 +1,6 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useEffect, useState, Fragment } from "react"
@@ -78,43 +78,6 @@ interface DashboardData {
   stats: TradingStats;
   last4WeeksStats: TradingStats;
 }
-
-const groupLogsByWeek = (logs: DailyLog[]) => {
-  if (!logs || logs.length === 0) {
-    return [];
-  }
-
-  const weeklyLogs: { [key: string]: DailyLog[] } = {};
-
-  logs.forEach(log => {
-    // Parse date as UTC to avoid timezone issues. 'YYYY-MM-DD' is interpreted as
-    // UTC midnight, but getDay() can use the local timezone, causing day-of-week errors.
-    const parts = log.date.split('-').map(Number);
-    const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
-
-    const dayOfWeek = date.getUTCDay(); // Sunday - 0, Monday - 1, etc.
-
-    // Create a new date object for the Monday of that week.
-    const monday = new Date(date);
-    const diff = date.getUTCDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-    monday.setUTCDate(diff);
-
-    const weekKey = monday.toISOString().split('T')[0];
-
-    if (!weeklyLogs[weekKey]) {
-      weeklyLogs[weekKey] = [];
-    }
-    weeklyLogs[weekKey].push(log);
-  });
-
-  for (const weekKey in weeklyLogs) {
-    weeklyLogs[weekKey].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  }
-
-  return Object.entries(weeklyLogs)
-    .map(([week, logs]) => ({ week, logs }))
-    .sort((a, b) => new Date(b.week).getTime() - new Date(a.week).getTime());
-};
 
 // Add function to group daily logs by day of the week
 const groupLogsByDayOfWeek = (logs: DailyLog[]) => {
@@ -252,7 +215,6 @@ export default function Home() {
 
   const stats = dashboardData?.stats;
   const last4WeeksStats = dashboardData?.last4WeeksStats;
-  const weeklyGroupedLogs = dashboardData ? groupLogsByWeek(dashboardData.dailyLogs) : [];
   const dayOfWeekLogs = dashboardData ? groupLogsByDayOfWeek(dashboardData.dailyLogs) : {};
   
   const sessionLogs = dashboardData ? groupLogsBySession(dashboardData.dailyLogs) : {};
@@ -563,7 +525,7 @@ export default function Home() {
                                     <div className="p-4">
                                       {recentSessionLogs.length > 0 ? (
                                         <div className="space-y-2">
-                                          <div className="text-xs text-muted-foreground font-medium mb-1">Last 10 '{session}' sessions:</div>
+                                          <div className="text-xs text-muted-foreground font-medium mb-1">Last 10 {session} sessions:</div>
                                           <div className="space-y-2">
                                             {recentSessionLogs.map((log) => (
                                               <div key={log.date} className="flex items-center justify-between text-xs bg-muted/50 p-2 rounded-md">
@@ -765,7 +727,7 @@ export default function Home() {
                                         <div className="p-4">
                                           {recentSessionLogs.length > 0 ? (
                                             <div className="space-y-2">
-                                              <div className="text-xs text-muted-foreground font-medium mb-1">Last 10 '{session}' sessions:</div>
+                                              <div className="text-xs text-muted-foreground font-medium mb-1">Last 10 {session} sessions:</div>
                                               <div className="space-y-2">
                                                 {recentSessionLogs.map((log) => (
                                                   <div key={log.date} className="flex items-center justify-between text-xs bg-muted/50 p-2 rounded-md">
@@ -808,80 +770,5 @@ export default function Home() {
         </CardHeader>
       </Card>
     </main>
-  )
-}
-
-function WeeklyLogAccordion({ weeklyLogs }: { weeklyLogs: { week: string; logs: DailyLog[] }[] }) {
-  if (!weeklyLogs.length) return <div className="h-[300px] flex items-center justify-center">No data</div>
-
-  return (
-    <Accordion type="single" collapsible className="w-full">
-      {weeklyLogs.map(({ week, logs }) => {
-        const weekPnl = logs.reduce((acc, log) => acc + log.analysis.headline.totalPnl, 0);
-        const weekTrades = logs.reduce((acc, log) => acc + log.analysis.headline.totalTrades, 0);
-        const firstDay = logs[0].date;
-        const lastDay = logs[logs.length - 1].date;
-
-        return (
-          <AccordionItem value={week} key={week}>
-            <AccordionTrigger>
-              <div className="flex justify-between w-full pr-4">
-                <span>Week of {firstDay} - {lastDay}</span>
-                <div className="flex space-x-4">
-                  <span>Trades: {weekTrades}</span>
-                  <span className={getPnlColor(weekPnl)}>
-                    PnL: {formatPnL(weekPnl)}
-                  </span>
-                </div>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent>
-              <DashboardTable data={logs} />
-            </AccordionContent>
-          </AccordionItem>
-        )
-      })}
-    </Accordion>
-  )
-}
-
-function DashboardTable({ data }: { data: DailyLog[] }) {
-  if (!data.length) return <div className="h-[300px] flex items-center justify-center">No data</div>
-
-  return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
-            <TableHead>Date</TableHead>
-            <TableHead>PnL</TableHead>
-            <TableHead>Trades</TableHead>
-            <TableHead>Wins</TableHead>
-            <TableHead>Losses</TableHead>
-            <TableHead>Win%</TableHead>
-            <TableHead>Fill%</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.map((row, i) => {
-            const h = row.analysis.headline || {}
-            const winRate = h.totalTrades > 0 ? ((h.wins / h.totalTrades) * 100) : 0
-            return (
-              <TableRow key={row.date || i} className="hover:bg-transparent text-sm">
-                <TableCell className="py-1">{row.date}</TableCell>
-                <TableCell className={`py-1 ${getPnlColor(h.totalPnl)}`}>
-                  {formatPnL(h.totalPnl)}
-                </TableCell>
-                <TableCell className="py-1">{h.totalTrades}</TableCell>
-                <TableCell className="py-1">{h.wins}</TableCell>
-                <TableCell className="py-1">{h.losses}</TableCell>
-                <TableCell className="py-1">{formatPercent(winRate)}</TableCell>
-                <TableCell className="py-1">{row.analysis.tradeBreakdown?.fillRate || '-'}</TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
-    </div>
   )
 }

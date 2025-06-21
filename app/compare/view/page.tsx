@@ -53,12 +53,12 @@ export default function CompareViewPage() {
     fetchData();
   }, []);
 
-  const handleWeekMerged = async (weekStart: string) => {
+  const handleWeekMerged = async () => {
     // Refresh the data after a week is merged
     setLoading(true);
     try {
       await fetchData();
-    } catch (error) {
+    } catch {
       toast.error('Failed to refresh data', {
         description: 'There was an error refreshing the comparison data.'
       });
@@ -94,7 +94,7 @@ export default function CompareViewPage() {
   const getImprovementIndicator = (compareValue: number, baseValue: number, isHigherBetter: boolean = true) => {
     const improved = hasImproved(compareValue, baseValue, isHigherBetter);
     const diff = compareValue - baseValue;
-    
+
     if (diff === 0) return null;
 
     if (improved) {
@@ -164,7 +164,7 @@ export default function CompareViewPage() {
         <>
           {/* Collapsible Stats Pane */}
           <Card className="mb-6">
-            <CardHeader 
+            <CardHeader
               className="cursor-pointer hover:bg-muted/50 transition-colors"
               onClick={() => setStatsExpanded(!statsExpanded)}
             >
@@ -293,20 +293,20 @@ export default function CompareViewPage() {
                       <div className="text-sm font-medium text-muted-foreground">Win/Draw/Loss Comparison</div>
                       {getImprovementIndicator(stats.compareWinDrawLoss.wins, stats.baseWinDrawLoss.wins)}
                     </div>
-                    
+
                     {/* Compare Data */}
                     <div className="space-y-2">
                       <div className="text-xs font-medium text-blue-600">Compare Data</div>
                       <div className="flex items-center space-x-1">
-                        <div className="h-4 bg-green-600 rounded" style={{ 
-                          width: `${((stats.compareWinDrawLoss.wins) / (stats.totalCompareTrades || 1)) * 100}%` 
-                        }}/>
-                        <div className="h-4 bg-gray-400 rounded" style={{ 
-                          width: `${((stats.compareWinDrawLoss.draws) / (stats.totalCompareTrades || 1)) * 100}%` 
-                        }}/>
-                        <div className="h-4 bg-red-600 rounded" style={{ 
-                          width: `${((stats.compareWinDrawLoss.losses) / (stats.totalCompareTrades || 1)) * 100}%` 
-                        }}/>
+                        <div className="h-4 bg-green-600 rounded" style={{
+                          width: `${((stats.compareWinDrawLoss.wins) / (stats.totalCompareTrades || 1)) * 100}%`
+                        }} />
+                        <div className="h-4 bg-gray-400 rounded" style={{
+                          width: `${((stats.compareWinDrawLoss.draws) / (stats.totalCompareTrades || 1)) * 100}%`
+                        }} />
+                        <div className="h-4 bg-red-600 rounded" style={{
+                          width: `${((stats.compareWinDrawLoss.losses) / (stats.totalCompareTrades || 1)) * 100}%`
+                        }} />
                       </div>
                       <div className="flex justify-between text-xs">
                         <span className="text-green-600">{stats.compareWinDrawLoss.wins}</span>
@@ -319,15 +319,15 @@ export default function CompareViewPage() {
                     <div className="space-y-2">
                       <div className="text-xs font-medium text-orange-600">Base Data</div>
                       <div className="flex items-center space-x-1">
-                        <div className="h-4 bg-green-600 rounded" style={{ 
-                          width: `${((stats.baseWinDrawLoss.wins) / (stats.totalBaseTrades || 1)) * 100}%` 
-                        }}/>
-                        <div className="h-4 bg-gray-400 rounded" style={{ 
-                          width: `${((stats.baseWinDrawLoss.draws) / (stats.totalBaseTrades || 1)) * 100}%` 
-                        }}/>
-                        <div className="h-4 bg-red-600 rounded" style={{ 
-                          width: `${((stats.baseWinDrawLoss.losses) / (stats.totalBaseTrades || 1)) * 100}%` 
-                        }}/>
+                        <div className="h-4 bg-green-600 rounded" style={{
+                          width: `${((stats.baseWinDrawLoss.wins) / (stats.totalBaseTrades || 1)) * 100}%`
+                        }} />
+                        <div className="h-4 bg-gray-400 rounded" style={{
+                          width: `${((stats.baseWinDrawLoss.draws) / (stats.totalBaseTrades || 1)) * 100}%`
+                        }} />
+                        <div className="h-4 bg-red-600 rounded" style={{
+                          width: `${((stats.baseWinDrawLoss.losses) / (stats.totalBaseTrades || 1)) * 100}%`
+                        }} />
                       </div>
                       <div className="flex justify-between text-xs">
                         <span className="text-green-600">{stats.baseWinDrawLoss.wins}</span>
@@ -343,17 +343,17 @@ export default function CompareViewPage() {
                       <div className="text-sm font-medium text-muted-foreground">Green vs Red Days</div>
                       {getImprovementIndicator(stats.compareGreenRed.greenDays, stats.baseGreenRed.greenDays)}
                     </div>
-                    
+
                     {/* Compare Data */}
                     <div className="space-y-2">
                       <div className="text-xs font-medium text-blue-600">Compare Data</div>
                       <div className="flex items-center space-x-1">
-                        <div className="h-4 bg-green-600 rounded" style={{ 
-                          width: `${((stats.compareGreenRed.greenDays) / (stats.compareGreenRed.greenDays + stats.compareGreenRed.redDays || 1)) * 100}%` 
-                        }}/>
-                        <div className="h-4 bg-red-600 rounded" style={{ 
-                          width: `${((stats.compareGreenRed.redDays) / (stats.compareGreenRed.greenDays + stats.compareGreenRed.redDays || 1)) * 100}%` 
-                        }}/>
+                        <div className="h-4 bg-green-600 rounded" style={{
+                          width: `${((stats.compareGreenRed.greenDays) / (stats.compareGreenRed.greenDays + stats.compareGreenRed.redDays || 1)) * 100}%`
+                        }} />
+                        <div className="h-4 bg-red-600 rounded" style={{
+                          width: `${((stats.compareGreenRed.redDays) / (stats.compareGreenRed.greenDays + stats.compareGreenRed.redDays || 1)) * 100}%`
+                        }} />
                       </div>
                       <div className="flex justify-between text-xs">
                         <span className="text-green-600">{stats.compareGreenRed.greenDays} profitable</span>
@@ -365,12 +365,12 @@ export default function CompareViewPage() {
                     <div className="space-y-2">
                       <div className="text-xs font-medium text-orange-600">Base Data</div>
                       <div className="flex items-center space-x-1">
-                        <div className="h-4 bg-green-600 rounded" style={{ 
-                          width: `${((stats.baseGreenRed.greenDays) / (stats.baseGreenRed.greenDays + stats.baseGreenRed.redDays || 1)) * 100}%` 
-                        }}/>
-                        <div className="h-4 bg-red-600 rounded" style={{ 
-                          width: `${((stats.baseGreenRed.redDays) / (stats.baseGreenRed.greenDays + stats.baseGreenRed.redDays || 1)) * 100}%` 
-                        }}/>
+                        <div className="h-4 bg-green-600 rounded" style={{
+                          width: `${((stats.baseGreenRed.greenDays) / (stats.baseGreenRed.greenDays + stats.baseGreenRed.redDays || 1)) * 100}%`
+                        }} />
+                        <div className="h-4 bg-red-600 rounded" style={{
+                          width: `${((stats.baseGreenRed.redDays) / (stats.baseGreenRed.greenDays + stats.baseGreenRed.redDays || 1)) * 100}%`
+                        }} />
                       </div>
                       <div className="flex justify-between text-xs">
                         <span className="text-green-600">{stats.baseGreenRed.greenDays} profitable</span>
@@ -391,7 +391,7 @@ export default function CompareViewPage() {
                         stats.basePnlDistribution.bigWins + stats.basePnlDistribution.highProfitDays
                       )}
                     </div>
-                    
+
                     <div className="space-y-4">
                       {[
                         { label: '>$400', compareCount: stats.comparePnlDistribution.bigWins, baseCount: stats.basePnlDistribution.bigWins, className: 'bg-green-600' },
@@ -406,10 +406,9 @@ export default function CompareViewPage() {
                           <div key={index}>
                             <div className="flex justify-between items-center text-xs mb-1">
                               <span className="text-muted-foreground">{item.label}</span>
-                              <span className={`font-bold ${
-                                (item.compareCount || 0) > (item.baseCount || 0) ? 'text-green-500' :
-                                (item.compareCount || 0) < (item.baseCount || 0) ? 'text-red-500' : ''
-                              }`}>
+                              <span className={`font-bold ${(item.compareCount || 0) > (item.baseCount || 0) ? 'text-green-500' :
+                                  (item.compareCount || 0) < (item.baseCount || 0) ? 'text-red-500' : ''
+                                }`}>
                                 {item.compareCount || 0} vs {item.baseCount || 0}
                               </span>
                             </div>

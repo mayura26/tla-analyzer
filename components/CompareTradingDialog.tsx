@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { DailyStats, SessionStats, TradeListEntry } from "@/lib/trading-log-parser";
+import { DailyStats, TradeListEntry } from "@/lib/trading-log-parser";
 import { format } from "date-fns";
-import { TrendingUp, TrendingDown, Target, DollarSign, ArrowRight, Trophy, AlertTriangle, Plus, Minus, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { compareTradingLogs } from "@/lib/trading-log-comparator";
@@ -201,67 +201,16 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
     }).format(value);
   };
 
-  const formatTime = (date: Date) => format(date, 'HH:mm');
-
   const formatDifference = (diff: { value: number; percentage: number }) => {
     const sign = diff.value >= 0 ? '+' : '';
     return `${sign}${formatCurrency(diff.value)} (${sign}${diff.percentage.toFixed(1)}%)`;
-  };
-
-  const formatDateDifference = (oldDate: Date, newDate: Date) => {
-    return `${format(oldDate, 'HH:mm')} → ${format(newDate, 'HH:mm')}`;
   };
 
   const getPnlColor = (value: number) => {
     return value >= 0 ? 'text-green-500' : 'text-red-500';
   };
 
-  const getWinRateColor = (wins: number, total: number) => {
-    const rate = (wins / total) * 100;
-    if (rate >= 60) return 'text-green-500';
-    if (rate >= 50) return 'text-yellow-500';
-    return 'text-red-500';
-  };
-
-  const getSubTradeDiffs = (oldSubTrades: TradeListEntry['subTrades'][number][], newSubTrades: TradeListEntry['subTrades'][number][], trade: TradeListEntry) => {
-    const diffs: React.ReactNode[] = [];
-    const maxLen = Math.max(oldSubTrades.length, newSubTrades.length);
-    for (let i = 0; i < maxLen; i++) {
-      const oldSub = oldSubTrades[i];
-      const newSub = newSubTrades[i];
-      if (!oldSub && newSub) {
-        diffs.push(
-          <div key={i} className="ml-2">
-            <span className="text-muted-foreground">Added sub-trade:</span> {newSub.quantity} @ {newSub.exitPrice} ({newSub.exitReason}) <span className={getPnlColor(newSub.pnl)}>{formatCurrency(newSub.pnl)}</span>
-          </div>
-        );
-      } else if (oldSub && !newSub) {
-        diffs.push(
-          <div key={i} className="ml-2">
-            <span className="text-muted-foreground">Removed sub-trade:</span> {oldSub.quantity} @ {oldSub.exitPrice} ({oldSub.exitReason}) <span className={getPnlColor(oldSub.pnl)}>{formatCurrency(oldSub.pnl)}</span>
-          </div>
-        );
-      } else if (oldSub && newSub) {
-        // Compare fields
-        const fieldDiffs: React.ReactNode[] = [];
-        if (oldSub.exitPrice !== newSub.exitPrice) fieldDiffs.push(<span key="exitPrice">exitPrice: <span className="line-through">{oldSub.exitPrice}</span> <ArrowRight className="w-3 h-3 inline mx-1" /> {newSub.exitPrice}</span>);
-        if (oldSub.quantity !== newSub.quantity) fieldDiffs.push(<span key="quantity">quantity: <span className="line-through">{oldSub.quantity}</span> <ArrowRight className="w-3 h-3 inline mx-1" /> {newSub.quantity}</span>);
-        if (oldSub.pnl !== newSub.pnl) fieldDiffs.push(<span key="pnl">pnl: <span className="line-through">{formatCurrency(oldSub.pnl)}</span> <ArrowRight className="w-3 h-3 inline mx-1" /> <span className={getPnlColor(newSub.pnl)}>{formatCurrency(newSub.pnl)}</span></span>);
-        if (oldSub.points !== newSub.points) fieldDiffs.push(<span key="points">points: <span className="line-through">{oldSub.points}</span> <ArrowRight className="w-3 h-3 inline mx-1" /> {newSub.points}</span>);
-        if (oldSub.exitReason !== newSub.exitReason) fieldDiffs.push(<span key="exitReason">exitReason: <span className="line-through">{oldSub.exitReason}</span> <ArrowRight className="w-3 h-3 inline mx-1" /> {newSub.exitReason}</span>);
-        if (fieldDiffs.length > 0) {
-          diffs.push(
-            <div key={i} className="ml-2">
-              <span className="text-muted-foreground">Sub-trade {i + 1}:</span> {fieldDiffs.map((fd, idx) => <span key={idx} className="ml-1">{fd}</span>)}
-            </div>
-          );
-        }
-      }
-    }
-    return diffs;
-  };
-
-  const renderSubTradeComparison = (oldSubTrades: TradeListEntry['subTrades'][number][], newSubTrades: TradeListEntry['subTrades'][number][], trade: TradeListEntry) => {
+  const renderSubTradeComparison = (oldSubTrades: TradeListEntry['subTrades'][number][], newSubTrades: TradeListEntry['subTrades'][number][]) => {
     const maxLen = Math.max(oldSubTrades.length, newSubTrades.length);
     if (maxLen === 0) return null;
     // Check if there are any differences
@@ -345,14 +294,12 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
 
   const renderTrade = (trade: TradeListEntry, isModified = false, changes: { field: keyof TradeListEntry; oldValue: any; newValue: any }[] = []) => {
     const formatTime = (date: Date) => format(date, 'HH:mm');
-    const isWin = trade.totalPnl > 0;
 
     // Find subTrades change and get detailed diffs if present
-    let subTradeDiffs: React.ReactNode[] = [];
     let subTradeComparison: React.ReactNode = null;
     const filteredChanges = changes.filter(change => {
       if (change.field === 'subTrades') {
-        subTradeComparison = renderSubTradeComparison(change.oldValue, change.newValue, trade);
+        subTradeComparison = renderSubTradeComparison(change.oldValue, change.newValue);
         // Only keep this change if there are actual diffs
         return false;
       }

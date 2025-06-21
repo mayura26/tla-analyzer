@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DailyStats } from "@/lib/trading-log-parser";
 import { format } from "date-fns";
-import { TrendingUp, TrendingDown, Target, DollarSign, ArrowRight, Trophy, AlertTriangle, CheckCircle2, FileText } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, DollarSign, Trophy, CheckCircle2, FileText } from "lucide-react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { useState } from "react";
 import { CompareTradingDialog } from "./CompareTradingDialog";

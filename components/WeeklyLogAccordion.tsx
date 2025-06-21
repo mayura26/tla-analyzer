@@ -43,8 +43,8 @@ export function WeeklyLogAccordion({ weeks, notesData, onNotesChange }: WeeklyLo
   const transformToDailyStats = (day: DailyLog): DailyStats => {
     const { analysis } = day;
     // Parse date as local (no UTC shift)
-    let dateParts = day.date.split('-');
-    let localDate = new Date(
+    const dateParts = day.date.split('-');
+    const localDate = new Date(
       Number(dateParts[0]),
       Number(dateParts[1]) - 1,
       Number(dateParts[2])
@@ -81,15 +81,15 @@ export function WeeklyLogAccordion({ weeks, notesData, onNotesChange }: WeeklyLo
     <Accordion type="single" collapsible value={openWeek} onValueChange={setOpenWeek} className="w-full">
       {weeks.map((week) => {
         // Calculate Monday and Sunday for the week based on weekStart (no timezone conversion)
-        let [sy, sm, sd] = week.weekStart.split('-');
-        let weekStartDate = new Date(Number(sy), Number(sm) - 1, Number(sd));
+        const [sy, sm, sd] = week.weekStart.split('-');
+        const weekStartDate = new Date(Number(sy), Number(sm) - 1, Number(sd));
         // Get the day of the week (0 = Sunday, 1 = Monday, ... 6 = Saturday)
-        let dayOfWeek = weekStartDate.getDay();
+        const dayOfWeek = weekStartDate.getDay();
         // Calculate Monday (if already Monday, stays the same)
-        let monday = new Date(weekStartDate);
+        const monday = new Date(weekStartDate);
         monday.setDate(weekStartDate.getDate() - ((dayOfWeek + 6) % 7));
         // Calculate Sunday
-        let sunday = new Date(monday);
+        const sunday = new Date(monday);
         sunday.setDate(monday.getDate() + 6);
         return (
           <AccordionItem key={week.weekStart} value={week.weekStart} className="border rounded-lg mb-4">

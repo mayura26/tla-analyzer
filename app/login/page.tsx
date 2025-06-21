@@ -38,7 +38,7 @@ export default function LoginPage() {
           router.push("/admin");
         }
       }
-    } catch (error) {
+    } catch {
       setError("An error occurred during login");
     } finally {
       setLoading(false);

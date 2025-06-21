@@ -1,4 +1,4 @@
-import { Trade, DailyStats, TradingLogAnalysis, TradeListEntry } from './trading-log-parser';
+import { TradingLogAnalysis, TradeListEntry } from './trading-log-parser';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -253,7 +253,7 @@ class TradingDataStore {
     this.endpoints[endpoint].data = [];
     if (typeof window === 'undefined') {
       try {
-        await fs.unlink(this.endpoints[endpoint].path).catch(() => {});
+        await fs.unlink(this.endpoints[endpoint].path).catch(() => { });
       } catch (error) {
         console.error(`Error clearing ${endpoint} data:`, error);
       }
@@ -403,7 +403,7 @@ class TradingDataStore {
     await this.loadFromStorage('compare');
     const compareData = this.endpoints.compare.data;
     const dayIndex = compareData.findIndex(d => d.date === date);
-    
+
     if (dayIndex === -1) {
       return null;
     }
@@ -427,7 +427,7 @@ class TradingDataStore {
     await this.loadFromStorage('compare');
     const compareData = this.endpoints.compare.data;
     const dayIndex = compareData.findIndex(d => d.date === date);
-    
+
     if (dayIndex === -1) {
       return null;
     }
@@ -450,7 +450,7 @@ class TradingDataStore {
     await this.loadFromStorage('compare');
     const compareData = this.endpoints.compare.data;
     const compareDay = compareData.find(d => d.date === date);
-    
+
     if (!compareDay) {
       return false;
     }
@@ -480,19 +480,19 @@ class TradingDataStore {
     // Get the compare data for all days in the week
     await this.loadFromStorage('compare');
     const compareData = this.endpoints.compare.data;
-    
+
     // Calculate the week range using date strings to avoid timezone issues
     const [year, month, day] = weekStart.split('-').map(Number);
-    
+
     // Create a temporary date object just for calculating the week boundaries
     // Use UTC to avoid timezone issues
     const weekStartDate = new Date(Date.UTC(year, month - 1, day));
     const dayOfWeek = weekStartDate.getUTCDay();
-    
+
     // Calculate Monday of the week
     const mondayOffset = (dayOfWeek + 6) % 7; // Days to subtract to get to Monday
     const mondayDate = new Date(Date.UTC(year, month - 1, day - mondayOffset));
-    
+
     // Generate all 7 days of the week as YYYY-MM-DD strings
     const weekDays: string[] = [];
     for (let i = 0; i < 7; i++) {
@@ -500,10 +500,10 @@ class TradingDataStore {
       const dateString = currentDate.toISOString().split('T')[0];
       weekDays.push(dateString);
     }
-    
+
     // Find all compare data for the exact week days
     const weekCompareData = compareData.filter(d => weekDays.includes(d.date));
-    
+
     if (weekCompareData.length === 0) {
       return false;
     }
@@ -519,7 +519,7 @@ class TradingDataStore {
 
     // Remove all compare data for this week after successful merge
     const updatedCompareData = compareData.filter(d => !weekDays.includes(d.date));
-    
+
     this.endpoints.compare.data = updatedCompareData;
     await this.saveToStorage('compare');
 

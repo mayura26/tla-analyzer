@@ -2,7 +2,6 @@
 import { useState } from "react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { CompareTradingCard } from "@/components/CompareTradingCard";
 import { format } from "date-fns";
 import { TrendingUp, TrendingDown, Target, DollarSign, GitMerge } from "lucide-react";
@@ -25,26 +24,15 @@ export function CompareWeeklyAccordion({ weeks, onWeekMerged }: CompareWeeklyAcc
     }).format(value)
   }
 
-  const getPnlColor = (value: number) => {
-    return value >= 0 ? 'text-green-500' : 'text-red-500'
-  }
-
   const getPnlIcon = (value: number) => {
     return value >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />
-  }
-
-  const getWinRateColor = (wins: number, total: number) => {
-    const rate = (wins / total) * 100
-    if (rate >= 60) return 'text-green-500'
-    if (rate >= 40) return 'text-yellow-500'
-    return 'text-red-500'
   }
 
   // Accepts analysis object and date
   const transformToDailyStats = (analysis: any, date: string) => {
     if (!analysis) return undefined;
-    let dateParts = date.split('-');
-    let localDate = new Date(
+    const dateParts = date.split('-');
+    const localDate = new Date(
       Number(dateParts[0]),
       Number(dateParts[1]) - 1,
       Number(dateParts[2])
@@ -140,12 +128,12 @@ export function CompareWeeklyAccordion({ weeks, onWeekMerged }: CompareWeeklyAcc
     <Accordion type="single" collapsible value={openWeek} onValueChange={setOpenWeek} className="w-full">
       {weeks.map((week: any) => {
         // Calculate Monday and Sunday for the week based on weekStart (no timezone conversion)
-        let [sy, sm, sd] = week.weekStart.split('-');
-        let weekStartDate = new Date(Number(sy), Number(sm) - 1, Number(sd));
-        let dayOfWeek = weekStartDate.getDay();
-        let monday = new Date(weekStartDate);
+        const [sy, sm, sd] = week.weekStart.split('-');
+        const weekStartDate = new Date(Number(sy), Number(sm) - 1, Number(sd));
+        const dayOfWeek = weekStartDate.getDay();
+        const monday = new Date(weekStartDate);
         monday.setDate(weekStartDate.getDate() - ((dayOfWeek + 6) % 7));
-        let sunday = new Date(monday);
+        const sunday = new Date(monday);
         sunday.setDate(monday.getDate() + 6);
 
         // Calculate diffs for the week

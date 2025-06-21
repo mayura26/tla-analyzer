@@ -13,7 +13,7 @@ import {
   Area,
   Line
 } from 'recharts'
-import { format, subDays } from 'date-fns'
+import { format } from 'date-fns'
 import { useTheme } from 'next-themes'
 
 interface DailyLog {
@@ -112,7 +112,6 @@ export function PnlTrendChart({ dailyLogs }: PnlTrendChartProps) {
   const rollingPnlValues = chartData.map(d => d.rollingPnl);
   const maxRollingPnl = Math.max(...rollingPnlValues, 0);
   const minRollingPnl = Math.min(...rollingPnlValues, 0);
-  const padding = Math.max(Math.abs(maxRollingPnl), Math.abs(minRollingPnl)) * 0.1;
 
   return (
     <Card className="bg-card/50">
