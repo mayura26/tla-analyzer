@@ -5,6 +5,10 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useSession, signOut } from "next-auth/react";
+import { User, LogOut } from "lucide-react";
 import React from "react";
 
 const navItems = [
@@ -23,11 +27,20 @@ const navItems = [
   {
     title: "View Comparison",
     href: "/compare/view"
+  },
+  {
+    title: "Admin",
+    href: "/admin"
   }
 ];
 
 export function Nav() {
   const pathname = usePathname();
+  const { data: session, status } = useSession();
+
+  const handleLogout = () => {
+    signOut({ callbackUrl: "/" });
+  };
 
   return (
     <nav className="border-b">
@@ -39,7 +52,7 @@ export function Nav() {
             </Link>
           </div>
           <div className="flex items-center gap-6">
-            {navItems.map((item, index) => (
+            {status === "authenticated" && navItems.map((item, index) => (
               <React.Fragment key={item.href}>
                 <Link
                   href={item.href}
@@ -57,7 +70,31 @@ export function Nav() {
                 )}
               </React.Fragment>
             ))}
+            
             <ThemeToggle />
+            
+            {status === "authenticated" ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    <span className="hidden sm:inline">{session?.user?.name || "Admin"}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleLogout} className="flex items-center gap-2">
+                    <LogOut className="h-4 w-4" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : status === "unauthenticated" ? (
+              <Link href="/login">
+                <Button variant="outline" size="sm">
+                  Sign In
+                </Button>
+              </Link>
+            ) : null}
           </div>
         </div>
       </div>

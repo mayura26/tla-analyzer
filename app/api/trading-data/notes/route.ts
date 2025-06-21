@@ -2,10 +2,41 @@ import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 
-interface NotesData {
+interface NoteData {
   date: string;
   notes: string;
   lastModified: string;
+}
+
+interface NotesFile {
+  notes: Record<string, NoteData>;
+  lastUpdated: string;
+}
+
+const NOTES_FILE_PATH = path.join(process.cwd(), 'data', 'notes.json');
+
+async function readNotesFile(): Promise<NotesFile> {
+  try {
+    const data = await fs.readFile(NOTES_FILE_PATH, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    // If file doesn't exist, return empty structure
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return {
+        notes: {},
+        lastUpdated: new Date().toISOString()
+      };
+    }
+    throw error;
+  }
+}
+
+async function writeNotesFile(notesData: NotesFile): Promise<void> {
+  await fs.writeFile(
+    NOTES_FILE_PATH,
+    JSON.stringify(notesData, null, 2),
+    'utf-8'
+  );
 }
 
 export async function GET(request: Request) {
@@ -35,30 +66,24 @@ export async function GET(request: Request) {
       );
     }
 
-    const notesDir = path.join(process.cwd(), 'data', 'notes');
-    const notesFilePath = path.join(notesDir, `${date}.json`);
-
-    try {
-      const notesData = await fs.readFile(notesFilePath, 'utf-8');
-      const parsedNotes: NotesData = JSON.parse(notesData);
-      
+    const notesFile = await readNotesFile();
+    const noteData = notesFile.notes[date];
+    
+    if (noteData) {
       return NextResponse.json({
         success: true,
-        data: parsedNotes
+        data: noteData
       });
-    } catch (error) {
-      // If file doesn't exist, return empty notes
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return NextResponse.json({
-          success: true,
-          data: {
-            date,
-            notes: '',
-            lastModified: new Date().toISOString()
-          }
-        });
-      }
-      throw error;
+    } else {
+      // Return empty notes if not found
+      return NextResponse.json({
+        success: true,
+        data: {
+          date,
+          notes: '',
+          lastModified: new Date().toISOString()
+        }
+      });
     }
   } catch (error) {
     console.error("Error in notes GET:", error);
@@ -79,34 +104,13 @@ async function getAllNotesInRange(startDate: string, endDate: string) {
       );
     }
 
-    const notesDir = path.join(process.cwd(), 'data', 'notes');
+    const notesFile = await readNotesFile();
+    const notesInRange: NoteData[] = [];
     
-    // Ensure notes directory exists
-    try {
-      await fs.mkdir(notesDir, { recursive: true });
-    } catch (error) {
-      console.error('Error creating notes directory:', error);
-    }
-
-    // Read all files in the notes directory
-    const files = await fs.readdir(notesDir);
-    const notesFiles = files.filter(file => file.endsWith('.json'));
-    
-    const notesInRange: NotesData[] = [];
-    
-    for (const file of notesFiles) {
-      const dateFromFile = file.replace('.json', '');
-      
-      // Check if the date is within the range
-      if (dateFromFile >= startDate && dateFromFile <= endDate) {
-        try {
-          const filePath = path.join(notesDir, file);
-          const notesData = await fs.readFile(filePath, 'utf-8');
-          const parsedNotes: NotesData = JSON.parse(notesData);
-          notesInRange.push(parsedNotes);
-        } catch (error) {
-          console.error(`Error reading notes file ${file}:`, error);
-        }
+    // Filter notes within the date range
+    for (const [dateKey, noteData] of Object.entries(notesFile.notes)) {
+      if (dateKey >= startDate && dateKey <= endDate) {
+        notesInRange.push(noteData);
       }
     }
     
@@ -145,33 +149,25 @@ export async function POST(request: Request) {
       );
     }
 
-    const notesDir = path.join(process.cwd(), 'data', 'notes');
-    const notesFilePath = path.join(notesDir, `${date}.json`);
-
-    // Ensure notes directory exists
-    try {
-      await fs.mkdir(notesDir, { recursive: true });
-    } catch (error) {
-      console.error('Error creating notes directory:', error);
-    }
-
-    const notesData: NotesData = {
+    const notesFile = await readNotesFile();
+    
+    const noteData: NoteData = {
       date,
       notes,
       lastModified: new Date().toISOString()
     };
 
-    // Write notes to file
-    await fs.writeFile(
-      notesFilePath,
-      JSON.stringify(notesData, null, 2),
-      'utf-8'
-    );
+    // Update or add the note
+    notesFile.notes[date] = noteData;
+    notesFile.lastUpdated = new Date().toISOString();
+
+    // Write updated notes to file
+    await writeNotesFile(notesFile);
 
     return NextResponse.json({ 
       success: true, 
       message: 'Notes saved successfully',
-      data: notesData
+      data: noteData
     });
   } catch (error) {
     console.error("Error in notes POST:", error);
@@ -202,24 +198,22 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const notesDir = path.join(process.cwd(), 'data', 'notes');
-    const notesFilePath = path.join(notesDir, `${date}.json`);
-
-    try {
-      await fs.unlink(notesFilePath);
+    const notesFile = await readNotesFile();
+    
+    if (notesFile.notes[date]) {
+      delete notesFile.notes[date];
+      notesFile.lastUpdated = new Date().toISOString();
+      await writeNotesFile(notesFile);
+      
       return NextResponse.json({ 
         success: true, 
         message: 'Notes deleted successfully'
       });
-    } catch (error) {
-      // If file doesn't exist, consider it already deleted
-      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-        return NextResponse.json({ 
-          success: true, 
-          message: 'Notes already deleted'
-        });
-      }
-      throw error;
+    } else {
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Notes already deleted'
+      });
     }
   } catch (error) {
     console.error("Error in notes DELETE:", error);
