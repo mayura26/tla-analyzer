@@ -101,9 +101,22 @@ export async function POST(request: Request) {
           message: 'Compare data successfully merged to base data' 
         });
 
+      case 'mergeWeek':
+        const mergeWeekResult = await tradingDataStore.mergeWeekCompareToBase(date);
+        if (!mergeWeekResult) {
+          return NextResponse.json(
+            { error: 'No compare data found for the specified week' },
+            { status: 404 }
+          );
+        }
+        return NextResponse.json({ 
+          success: true, 
+          message: 'All compare data for the week successfully merged to base data' 
+        });
+
       default:
         return NextResponse.json(
-          { error: 'Invalid action. Supported actions: verify, addNotes, merge' },
+          { error: 'Invalid action. Supported actions: verify, addNotes, merge, mergeWeek' },
           { status: 400 }
         );
     }

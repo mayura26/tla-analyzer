@@ -2,9 +2,10 @@
 import { useState } from "react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { CompareTradingCard } from "@/components/CompareTradingCard";
 import { format } from "date-fns";
-import { TrendingUp, TrendingDown, Target, DollarSign } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, DollarSign, GitMerge } from "lucide-react";
 
 interface CompareWeeklyAccordionProps {
   weeks: any[];
@@ -12,6 +13,7 @@ interface CompareWeeklyAccordionProps {
 
 export function CompareWeeklyAccordion({ weeks }: CompareWeeklyAccordionProps) {
   const [openWeek, setOpenWeek] = useState(weeks.length > 0 ? weeks[0].weekStart : "");
+  const [mergeLoading, setMergeLoading] = useState<Record<string, boolean>>({});
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -87,6 +89,38 @@ export function CompareWeeklyAccordion({ weeks }: CompareWeeklyAccordionProps) {
       if (abs < 150) return 'text-red-400';
       if (abs < 300) return 'text-red-600 font-bold';
       return 'text-red-800 font-extrabold';
+    }
+  };
+
+  const mergeWeek = async (weekStart: string) => {
+    setMergeLoading(prev => ({ ...prev, [weekStart]: true }));
+    
+    try {
+      const response = await fetch('/api/trading-data/compare/manage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'mergeWeek',
+          date: weekStart,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // Optionally refresh the page or update the UI
+        window.location.reload();
+      } else {
+        console.error('Merge failed:', result.error);
+        alert('Failed to merge week data: ' + result.error);
+      }
+    } catch (error) {
+      console.error('Error merging week:', error);
+      alert('Error merging week data');
+    } finally {
+      setMergeLoading(prev => ({ ...prev, [weekStart]: false }));
     }
   };
 
@@ -168,6 +202,19 @@ export function CompareWeeklyAccordion({ weeks }: CompareWeeklyAccordionProps) {
                   {diff.hasChanges && (
                     <div className="flex items-center gap-2">
                       {getPnlIcon(diff.pnlDiff)}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          mergeWeek(week.weekStart);
+                        }}
+                        disabled={mergeLoading[week.weekStart]}
+                        className="ml-2"
+                      >
+                        <GitMerge className="w-4 h-4 mr-1" />
+                        {mergeLoading[week.weekStart] ? 'Merging...' : 'Merge Week'}
+                      </Button>
                     </div>
                   )}
                 </div>

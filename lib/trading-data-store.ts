@@ -456,6 +456,11 @@ class TradingDataStore {
       metadata: compareDay.metadata
     });
 
+    // Remove the compare data for this date after successful merge
+    const updatedCompareData = compareData.filter(d => d.date !== date);
+    this.endpoints.compare.data = updatedCompareData;
+    await this.saveToStorage('compare');
+
     return true;
   }
 
@@ -463,6 +468,48 @@ class TradingDataStore {
     await this.loadFromStorage('compare');
     const compareData = this.endpoints.compare.data;
     return compareData.find(d => d.date === date) || null;
+  }
+
+  async mergeWeekCompareToBase(weekStart: string): Promise<boolean> {
+    // Get the compare data for all days in the week
+    await this.loadFromStorage('compare');
+    const compareData = this.endpoints.compare.data;
+    
+    // Calculate the week range
+    const [year, month, day] = weekStart.split('-').map(Number);
+    const weekStartDate = new Date(year, month - 1, day);
+    const weekEndDate = new Date(weekStartDate);
+    weekEndDate.setDate(weekStartDate.getDate() + 6);
+    
+    // Find all compare data within the week range
+    const weekCompareData = compareData.filter(d => {
+      const dayDate = new Date(d.date);
+      return dayDate >= weekStartDate && dayDate <= weekEndDate;
+    });
+    
+    if (weekCompareData.length === 0) {
+      return false;
+    }
+
+    // Merge each day's compare data to base data
+    for (const compareDay of weekCompareData) {
+      await this.addLog('daily', {
+        date: compareDay.date,
+        analysis: compareDay.analysis,
+        metadata: compareDay.metadata
+      });
+    }
+
+    // Remove all compare data for this week after successful merge
+    const updatedCompareData = compareData.filter(d => {
+      const dayDate = new Date(d.date);
+      return !(dayDate >= weekStartDate && dayDate <= weekEndDate);
+    });
+    
+    this.endpoints.compare.data = updatedCompareData;
+    await this.saveToStorage('compare');
+
+    return true;
   }
 }
 

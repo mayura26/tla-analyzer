@@ -33,7 +33,7 @@ export async function GET() {
     });
 
     // Only include weeks that exist in the compare data
-    const allWeekKeys = Array.from(compareWeeksMap.keys()).sort();
+    const allWeekKeys = Array.from(compareWeeksMap.keys()).sort().reverse();
 
     // If no weeks found, return empty array
     if (allWeekKeys.length === 0) {
