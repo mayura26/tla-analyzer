@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { tradingDataStore } from '@/lib/trading-data-store';
+import { tradingDataStore, DailyLog } from '@/lib/trading-data-store';
 import { parseTradingLog } from '@/lib/trading-log-parser';
-import { promises as fs } from "fs";
-import path from "path";
 import { startOfWeek, endOfWeek, format, parseISO } from "date-fns";
 
 function getWeekKey(dateStr: string) {
@@ -14,36 +12,21 @@ function getWeekKey(dateStr: string) {
 
 export async function GET() {
   try {
-    // Read both data files
-    const compareDataPath = path.join(process.cwd(), "data", "compare-data.json");
-    const baseDataPath = path.join(process.cwd(), "data", "all-days.json");
-
-    let compareData: any[] = [];
-    let baseData: any[] = [];
-
-    try {
-      const [compareDataRaw, baseDataRaw] = await Promise.all([
-        fs.readFile(compareDataPath, "utf-8"),
-        fs.readFile(baseDataPath, "utf-8")
-      ]);
-
-      // Safely parse JSON with fallback to empty array
-      compareData = compareDataRaw ? JSON.parse(compareDataRaw) : [];
-      baseData = baseDataRaw ? JSON.parse(baseDataRaw) : [];
-    } catch (error) {
-      console.error("Error reading or parsing data files:", error);
-      // Continue with empty arrays if files don't exist or are malformed
-    }
+    // Get data from the trading data store
+    const [compareData, baseData] = await Promise.all([
+      tradingDataStore.getCompareData(),
+      tradingDataStore.getAllDays()
+    ]);
 
     // Group compare and base data by week
     const compareWeeksMap = new Map();
-    compareData.forEach((day: any) => {
+    compareData.forEach((day: DailyLog) => {
       const weekKey = getWeekKey(day.date);
       if (!compareWeeksMap.has(weekKey)) compareWeeksMap.set(weekKey, []);
       compareWeeksMap.get(weekKey).push(day);
     });
     const baseWeeksMap = new Map();
-    baseData.forEach((day: any) => {
+    baseData.forEach((day: DailyLog) => {
       const weekKey = getWeekKey(day.date);
       if (!baseWeeksMap.has(weekKey)) baseWeeksMap.set(weekKey, []);
       baseWeeksMap.get(weekKey).push(day);
@@ -63,23 +46,23 @@ export async function GET() {
       const baseDays = baseWeeksMap.get(weekKey) || [];
       // Get all unique dates in this week
       const allDates = Array.from(new Set([
-        ...compareDays.map((d: any) => d.date),
-        ...baseDays.map((d: any) => d.date)
+        ...compareDays.map((d: DailyLog) => d.date),
+        ...baseDays.map((d: DailyLog) => d.date)
       ])).sort();
       // Find week start and end
       const weekStartDate = startOfWeek(parseISO(allDates[0]), { weekStartsOn: 1 });
       const weekEndDate = endOfWeek(parseISO(allDates[0]), { weekStartsOn: 1 });
       // Build days array for compare and base
-      const compareDaysMap = new Map(compareDays.map((d: any) => [d.date, d]));
-      const baseDaysMap = new Map(baseDays.map((d: any) => [d.date, d]));
+      const compareDaysMap = new Map<string, DailyLog>(compareDays.map((d: DailyLog) => [d.date, d]));
+      const baseDaysMap = new Map<string, DailyLog>(baseDays.map((d: DailyLog) => [d.date, d]));
       // For each date, build a day entry for compare and base
       const days = allDates.map(date => {
         const compareDay = compareDaysMap.get(date);
         const baseDay = baseDaysMap.get(date);
         return {
           date,
-          compareAnalysis: compareDay ? (compareDay as any).analysis : null,
-          baseAnalysis: baseDay ? (baseDay as any).analysis : null
+          compareAnalysis: compareDay ? compareDay.analysis : null,
+          baseAnalysis: baseDay ? baseDay.analysis : null
         };
       });
       // Calculate weekHeadline for compare and base
