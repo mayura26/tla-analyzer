@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { DailyStats } from "@/lib/trading-log-parser"
-import { format, isAfter, isBefore, parse } from "date-fns"
+import { format } from "date-fns"
 import { ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, Target, AlertTriangle, FileText, Loader2 } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
