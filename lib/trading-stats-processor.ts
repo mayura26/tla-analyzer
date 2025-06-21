@@ -66,6 +66,8 @@ export interface TradingStats {
       netWinRate: number;
       greenDays: number;
       redDays: number;
+      bigWins: number;
+      bigLosses: number;
     };
   };
   sessionStats: {
@@ -157,13 +159,13 @@ export class TradingStatsProcessor {
           highLossDays: 0
         },
         dayOfWeekStats: {
-          Monday: { totalDays: 0, totalTrades: 0, totalPnl: 0, averageTrades: 0, averagePnl: 0, wins: 0, losses: 0, draws: 0, winRate: 0, netWinRate: 0, greenDays: 0, redDays: 0 },
-          Tuesday: { totalDays: 0, totalTrades: 0, totalPnl: 0, averageTrades: 0, averagePnl: 0, wins: 0, losses: 0, draws: 0, winRate: 0, netWinRate: 0, greenDays: 0, redDays: 0 },
-          Wednesday: { totalDays: 0, totalTrades: 0, totalPnl: 0, averageTrades: 0, averagePnl: 0, wins: 0, losses: 0, draws: 0, winRate: 0, netWinRate: 0, greenDays: 0, redDays: 0 },
-          Thursday: { totalDays: 0, totalTrades: 0, totalPnl: 0, averageTrades: 0, averagePnl: 0, wins: 0, losses: 0, draws: 0, winRate: 0, netWinRate: 0, greenDays: 0, redDays: 0 },
-          Friday: { totalDays: 0, totalTrades: 0, totalPnl: 0, averageTrades: 0, averagePnl: 0, wins: 0, losses: 0, draws: 0, winRate: 0, netWinRate: 0, greenDays: 0, redDays: 0 },
-          Saturday: { totalDays: 0, totalTrades: 0, totalPnl: 0, averageTrades: 0, averagePnl: 0, wins: 0, losses: 0, draws: 0, winRate: 0, netWinRate: 0, greenDays: 0, redDays: 0 },
-          Sunday: { totalDays: 0, totalTrades: 0, totalPnl: 0, averageTrades: 0, averagePnl: 0, wins: 0, losses: 0, draws: 0, winRate: 0, netWinRate: 0, greenDays: 0, redDays: 0 }
+          Monday: { totalDays: 0, totalTrades: 0, totalPnl: 0, averageTrades: 0, averagePnl: 0, wins: 0, losses: 0, draws: 0, winRate: 0, netWinRate: 0, greenDays: 0, redDays: 0, bigWins: 0, bigLosses: 0 },
+          Tuesday: { totalDays: 0, totalTrades: 0, totalPnl: 0, averageTrades: 0, averagePnl: 0, wins: 0, losses: 0, draws: 0, winRate: 0, netWinRate: 0, greenDays: 0, redDays: 0, bigWins: 0, bigLosses: 0 },
+          Wednesday: { totalDays: 0, totalTrades: 0, totalPnl: 0, averageTrades: 0, averagePnl: 0, wins: 0, losses: 0, draws: 0, winRate: 0, netWinRate: 0, greenDays: 0, redDays: 0, bigWins: 0, bigLosses: 0 },
+          Thursday: { totalDays: 0, totalTrades: 0, totalPnl: 0, averageTrades: 0, averagePnl: 0, wins: 0, losses: 0, draws: 0, winRate: 0, netWinRate: 0, greenDays: 0, redDays: 0, bigWins: 0, bigLosses: 0 },
+          Friday: { totalDays: 0, totalTrades: 0, totalPnl: 0, averageTrades: 0, averagePnl: 0, wins: 0, losses: 0, draws: 0, winRate: 0, netWinRate: 0, greenDays: 0, redDays: 0, bigWins: 0, bigLosses: 0 },
+          Saturday: { totalDays: 0, totalTrades: 0, totalPnl: 0, averageTrades: 0, averagePnl: 0, wins: 0, losses: 0, draws: 0, winRate: 0, netWinRate: 0, greenDays: 0, redDays: 0, bigWins: 0, bigLosses: 0 },
+          Sunday: { totalDays: 0, totalTrades: 0, totalPnl: 0, averageTrades: 0, averagePnl: 0, wins: 0, losses: 0, draws: 0, winRate: 0, netWinRate: 0, greenDays: 0, redDays: 0, bigWins: 0, bigLosses: 0 }
         },
         sessionStats: {
           morning: { totalDays: 0, totalTrades: 0, totalPnl: 0, averageTrades: 0, averagePnl: 0, winRate: 0, greenDays: 0, redDays: 0 },
@@ -200,13 +202,13 @@ export class TradingStatsProcessor {
     let highLossDays = 0;
 
     const dayOfWeekStats: { [key: string]: any } = {
-      Monday: { totalDays: 0, totalTrades: 0, totalPnl: 0, wins: 0, losses: 0, draws: 0, greenDays: 0, redDays: 0 },
-      Tuesday: { totalDays: 0, totalTrades: 0, totalPnl: 0, wins: 0, losses: 0, draws: 0, greenDays: 0, redDays: 0 },
-      Wednesday: { totalDays: 0, totalTrades: 0, totalPnl: 0, wins: 0, losses: 0, draws: 0, greenDays: 0, redDays: 0 },
-      Thursday: { totalDays: 0, totalTrades: 0, totalPnl: 0, wins: 0, losses: 0, draws: 0, greenDays: 0, redDays: 0 },
-      Friday: { totalDays: 0, totalTrades: 0, totalPnl: 0, wins: 0, losses: 0, draws: 0, greenDays: 0, redDays: 0 },
-      Saturday: { totalDays: 0, totalTrades: 0, totalPnl: 0, wins: 0, losses: 0, draws: 0, greenDays: 0, redDays: 0 },
-      Sunday: { totalDays: 0, totalTrades: 0, totalPnl: 0, wins: 0, losses: 0, draws: 0, greenDays: 0, redDays: 0 }
+      Monday: { totalDays: 0, totalTrades: 0, totalPnl: 0, wins: 0, losses: 0, draws: 0, greenDays: 0, redDays: 0, bigWins: 0, bigLosses: 0 },
+      Tuesday: { totalDays: 0, totalTrades: 0, totalPnl: 0, wins: 0, losses: 0, draws: 0, greenDays: 0, redDays: 0, bigWins: 0, bigLosses: 0 },
+      Wednesday: { totalDays: 0, totalTrades: 0, totalPnl: 0, wins: 0, losses: 0, draws: 0, greenDays: 0, redDays: 0, bigWins: 0, bigLosses: 0 },
+      Thursday: { totalDays: 0, totalTrades: 0, totalPnl: 0, wins: 0, losses: 0, draws: 0, greenDays: 0, redDays: 0, bigWins: 0, bigLosses: 0 },
+      Friday: { totalDays: 0, totalTrades: 0, totalPnl: 0, wins: 0, losses: 0, draws: 0, greenDays: 0, redDays: 0, bigWins: 0, bigLosses: 0 },
+      Saturday: { totalDays: 0, totalTrades: 0, totalPnl: 0, wins: 0, losses: 0, draws: 0, greenDays: 0, redDays: 0, bigWins: 0, bigLosses: 0 },
+      Sunday: { totalDays: 0, totalTrades: 0, totalPnl: 0, wins: 0, losses: 0, draws: 0, greenDays: 0, redDays: 0, bigWins: 0, bigLosses: 0 }
     };
 
     const sessionStats: TradingStats['sessionStats'] = {
@@ -285,6 +287,13 @@ export class TradingStatsProcessor {
           dayOfWeekStats[dayName].greenDays++;
         } else {
           dayOfWeekStats[dayName].redDays++;
+        }
+        
+        if (headline.bigWins && headline.bigWins > 0) {
+          dayOfWeekStats[dayName].bigWins += headline.bigWins;
+        }
+        if (headline.bigLosses && headline.bigLosses > 0) {
+          dayOfWeekStats[dayName].bigLosses += headline.bigLosses;
         }
       }
 
