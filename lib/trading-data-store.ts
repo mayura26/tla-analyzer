@@ -66,6 +66,12 @@ interface TradingData {
 export interface DailyLog {
   date: string;
   analysis: TradingLogAnalysis;
+  metadata?: {
+    verified?: boolean;
+    notes?: string;
+    verifiedAt?: string;
+    verifiedBy?: string;
+  };
 }
 
 export interface WeekLog {
@@ -384,6 +390,79 @@ class TradingDataStore {
     }
 
     return mergedData;
+  }
+
+  // New methods for compare data management
+  async markCompareAsVerified(date: string, verified: boolean, verifiedBy?: string): Promise<DailyLog | null> {
+    await this.loadFromStorage('compare');
+    const compareData = this.endpoints.compare.data;
+    const dayIndex = compareData.findIndex(d => d.date === date);
+    
+    if (dayIndex === -1) {
+      return null;
+    }
+
+    const updatedDay = {
+      ...compareData[dayIndex],
+      metadata: {
+        ...compareData[dayIndex].metadata,
+        verified,
+        verifiedAt: verified ? new Date().toISOString() : undefined,
+        verifiedBy: verified ? (verifiedBy || 'system') : undefined
+      }
+    };
+
+    compareData[dayIndex] = updatedDay;
+    await this.saveToStorage('compare');
+    return updatedDay;
+  }
+
+  async addCompareNotes(date: string, notes: string): Promise<DailyLog | null> {
+    await this.loadFromStorage('compare');
+    const compareData = this.endpoints.compare.data;
+    const dayIndex = compareData.findIndex(d => d.date === date);
+    
+    if (dayIndex === -1) {
+      return null;
+    }
+
+    const updatedDay = {
+      ...compareData[dayIndex],
+      metadata: {
+        ...compareData[dayIndex].metadata,
+        notes
+      }
+    };
+
+    compareData[dayIndex] = updatedDay;
+    await this.saveToStorage('compare');
+    return updatedDay;
+  }
+
+  async mergeCompareToBase(date: string): Promise<boolean> {
+    // Get the compare data for the specified date
+    await this.loadFromStorage('compare');
+    const compareData = this.endpoints.compare.data;
+    const compareDay = compareData.find(d => d.date === date);
+    
+    if (!compareDay) {
+      return false;
+    }
+
+    // Add the compare data to the base data (this will overwrite if it exists)
+    await this.addLog('daily', {
+      date: compareDay.date,
+      analysis: compareDay.analysis,
+      metadata: compareDay.metadata
+    });
+
+    return true;
+  }
+
+  async getCompareByDate(date: string): Promise<DailyLog | null> {
+    await this.loadFromStorage('compare');
+    const compareData = this.endpoints.compare.data;
+    return compareData.find(d => d.date === date) || null;
   }
 }
 

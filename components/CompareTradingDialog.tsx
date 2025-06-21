@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DailyStats, SessionStats, TradeListEntry } from "@/lib/trading-log-parser";
 import { format } from "date-fns";
-import { TrendingUp, TrendingDown, Target, DollarSign, ArrowRight, Trophy, AlertTriangle, Plus, Minus, CheckCircle2 } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, DollarSign, ArrowRight, Trophy, AlertTriangle, Plus, Minus, CheckCircle2, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { compareTradingLogs } from "@/lib/trading-log-comparator";
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { toast } from "sonner";
 
 interface CompareTradingDialogProps {
   isOpen: boolean;
@@ -18,13 +19,178 @@ interface CompareTradingDialogProps {
   baseStats: DailyStats & { tradeList?: TradeListEntry[] };
   compareStats: DailyStats & { tradeList?: TradeListEntry[] };
   onMerge?: () => void;
+  onVerificationChange?: (verified: boolean) => void;
+  onNotesChange?: (notes: string) => void;
 }
 
 type SessionKey = keyof DailyStats['sessionBreakdown'];
 
-export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats, onMerge }: CompareTradingDialogProps) {
+export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats, onMerge, onVerificationChange, onNotesChange }: CompareTradingDialogProps) {
   const [isVerified, setIsVerified] = useState(false);
   const [notes, setNotes] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isMerging, setIsMerging] = useState(false);
+  const [hasUnsavedNotes, setHasUnsavedNotes] = useState(false);
+
+  // Helper function to ensure date is in YYYY-MM-DD format
+  const getFormattedDate = (dateInput: string | Date): string => {
+    if (typeof dateInput === 'string') {
+      // If it's already a YYYY-MM-DD string, return it
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+        return dateInput;
+      }
+      // If it's a date string, parse it
+      const date = new Date(dateInput);
+      return format(date, 'yyyy-MM-dd');
+    } else {
+      // If it's a Date object
+      return format(dateInput, 'yyyy-MM-dd');
+    }
+  };
+
+  // Load existing metadata when dialog opens
+  useEffect(() => {
+    if (isOpen && baseStats.date) {
+      loadExistingMetadata();
+    }
+  }, [isOpen, baseStats.date]);
+
+  const loadExistingMetadata = async () => {
+    try {
+      setIsLoading(true);
+      const formattedDate = getFormattedDate(baseStats.date);
+      console.log('Loading metadata for date:', baseStats.date, '-> formatted:', formattedDate);
+      const response = await fetch(`/api/trading-data/compare/manage?date=${formattedDate}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.metadata) {
+          setIsVerified(data.metadata.verified || false);
+          setNotes(data.metadata.notes || "");
+        }
+      }
+    } catch (error) {
+      console.error('Error loading metadata:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveVerificationStatus = async (verified: boolean) => {
+    try {
+      setIsSaving(true);
+      const formattedDate = getFormattedDate(baseStats.date);
+      const response = await fetch('/api/trading-data/compare/manage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'verify',
+          date: formattedDate,
+          verified,
+          verifiedBy: 'user'
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(verified ? "Day marked as verified" : "Day marked as unverified");
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to update verification status");
+      }
+    } catch (error) {
+      console.error('Error saving verification status:', error);
+      toast.error("Failed to save verification status");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const saveNotes = async (newNotes: string) => {
+    try {
+      setIsSaving(true);
+      const formattedDate = getFormattedDate(baseStats.date);
+      const response = await fetch('/api/trading-data/compare/manage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'addNotes',
+          date: formattedDate,
+          notes: newNotes
+        }),
+      });
+
+      if (response.ok) {
+        toast.success("Notes saved successfully");
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to save notes");
+      }
+    } catch (error) {
+      console.error('Error saving notes:', error);
+      toast.error("Failed to save notes");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleVerificationChange = async (verified: boolean) => {
+    setIsVerified(verified);
+    await saveVerificationStatus(verified);
+    if (onVerificationChange) {
+      onVerificationChange(verified);
+    }
+  };
+
+  const handleNotesChange = (newNotes: string) => {
+    setNotes(newNotes);
+    setHasUnsavedNotes(true);
+  };
+
+  const handleSaveNotes = async () => {
+    await saveNotes(notes);
+    setHasUnsavedNotes(false);
+    if (onNotesChange) {
+      onNotesChange(notes);
+    }
+  };
+
+  const handleMerge = async () => {
+    try {
+      setIsMerging(true);
+      const formattedDate = getFormattedDate(baseStats.date);
+      const response = await fetch('/api/trading-data/compare/manage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'merge',
+          date: formattedDate
+        }),
+      });
+
+      if (response.ok) {
+        toast.success("Compare data successfully merged to base data");
+        // Call the parent's onMerge callback
+        if (onMerge) {
+          onMerge();
+        }
+        onClose();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to merge data");
+      }
+    } catch (error) {
+      console.error('Error merging data:', error);
+      toast.error("Failed to merge data");
+    } finally {
+      setIsMerging(false);
+    }
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -425,19 +591,42 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
   };
 
   const renderManageTab = () => {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center py-8">
+          <div className="flex items-center gap-2">
+            <Loader2 className="w-6 h-6 animate-spin" />
+            <span>Loading metadata...</span>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">
             <Label>Day Verification</Label>
             <div className="text-sm text-muted-foreground">
-              Mark this day as verified after reviewing the changes
+              {isVerified ? "This day has been verified and reviewed" : "Mark this day as verified after reviewing the changes"}
             </div>
           </div>
-          <Switch
-            checked={isVerified}
-            onCheckedChange={setIsVerified}
-          />
+          <div className="flex items-center gap-2">
+            {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+            <div className="flex items-center gap-2">
+              {isVerified && (
+                <div className="flex items-center gap-1 text-green-600">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span className="text-sm font-medium">Verified</span>
+                </div>
+              )}
+              <Switch
+                checked={isVerified}
+                onCheckedChange={handleVerificationChange}
+                disabled={isLoading}
+              />
+            </div>
+          </div>
         </div>
 
         <Separator />
@@ -447,21 +636,53 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
           <Textarea
             placeholder="Add any notes about the changes or verification..."
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={(e) => handleNotesChange(e.target.value)}
             className="min-h-[100px]"
+            disabled={isLoading}
           />
+          <div className="flex items-center justify-between">
+            {isSaving && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Saving notes...
+              </div>
+            )}
+            {hasUnsavedNotes && !isSaving && (
+              <div className="text-sm text-muted-foreground">
+                You have unsaved changes
+              </div>
+            )}
+            <Button
+              onClick={handleSaveNotes}
+              disabled={!hasUnsavedNotes || isSaving || isLoading}
+              size="sm"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Saving...
+                </>
+              ) : (
+                "Save Notes"
+              )}
+            </Button>
+          </div>
         </div>
 
         <Separator />
 
         <div className="flex justify-end">
           <Button
-            onClick={onMerge}
+            onClick={handleMerge}
             className="gap-2"
-            disabled={!isVerified}
+            disabled={!isVerified || isMerging || isLoading}
           >
-            <CheckCircle2 className="w-4 h-4" />
-            Merge Changes
+            {isMerging ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-4 h-4" />
+            )}
+            {isMerging ? "Merging..." : "Merge Changes"}
           </Button>
         </div>
       </div>
@@ -476,9 +697,17 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
         </DialogHeader>
         {/* Styled header bar for date and PnL diff */}
         <div className="flex items-center justify-between bg-muted/80 rounded-lg px-6 py-3 mb-4 border border-muted-foreground/10 shadow-sm">
-          <span className="font-semibold text-lg">
-            {baseStats.date ? format(new Date(baseStats.date), 'MMM dd, yyyy (EEE)') : ''}
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="font-semibold text-lg">
+              {baseStats.date ? format(new Date(baseStats.date), 'MMM dd, yyyy (EEE)') : ''}
+            </span>
+            {isVerified && (
+              <div className="flex items-center gap-1 text-green-600">
+                <CheckCircle2 className="w-5 h-5" />
+                <span className="text-sm font-medium">Verified</span>
+              </div>
+            )}
+          </div>
           <span className={`font-bold text-lg ${getPnlColor(compareStats.totalPnl - baseStats.totalPnl)}`}> 
             {formatCurrency(compareStats.totalPnl - baseStats.totalPnl)}
           </span>

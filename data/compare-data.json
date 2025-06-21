@@ -29198,6 +29198,12 @@
           "exitTimestamp": "2024-12-26T18:06:00.000Z"
         }
       ]
+    },
+    "metadata": {
+      "verified": true,
+      "notes": "Testing",
+      "verifiedAt": "2025-06-21T20:11:29.459Z",
+      "verifiedBy": "user"
     }
   },
   {
