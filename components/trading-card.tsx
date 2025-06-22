@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { DailyStats } from "@/lib/trading-log-parser"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { ArrowUpRight, ArrowDownRight, TrendingUp, TrendingDown, Target, AlertTriangle, FileText, Loader2 } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
@@ -34,11 +34,11 @@ export function TradingCard({ stats, notes: initialNotes = "", onNotesChange }: 
       if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
         return dateInput;
       }
-      // If it's a date string, parse it
-      const date = new Date(dateInput);
+      // If it's a date string, parse it without timezone conversion
+      const date = parseISO(dateInput);
       return format(date, 'yyyy-MM-dd');
     } else {
-      // If it's a Date object
+      // If it's a Date object, format it directly
       return format(dateInput, 'yyyy-MM-dd');
     }
   };

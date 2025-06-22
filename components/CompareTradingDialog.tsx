@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DailyStats, TradeListEntry } from "@/lib/trading-log-parser";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -40,11 +41,11 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
       if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
         return dateInput;
       }
-      // If it's a date string, parse it
-      const date = new Date(dateInput);
+      // If it's a date string, parse it without timezone conversion
+      const date = parseISO(dateInput);
       return format(date, 'yyyy-MM-dd');
     } else {
-      // If it's a Date object
+      // If it's a Date object, format it directly
       return format(dateInput, 'yyyy-MM-dd');
     }
   };
@@ -293,7 +294,13 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
   };
 
   const renderTrade = (trade: TradeListEntry, isModified = false, changes: { field: keyof TradeListEntry; oldValue: any; newValue: any }[] = []) => {
-    const formatTime = (date: Date) => format(date, 'HH:mm');
+    // Format time without timezone conversion - display exactly as in file
+    const formatTime = (dateInput: Date | string) => {
+      // Convert string to Date if needed
+      const date = typeof dateInput === 'string' ? parseISO(dateInput) : dateInput;
+      // Format the time directly without any timezone compensation
+      return formatInTimeZone(date, 'UTC', 'HH:mm');
+    };
 
     // Find subTrades change and get detailed diffs if present
     let subTradeComparison: React.ReactNode = null;
@@ -396,16 +403,34 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
                 const isDateLike = (val: any) => {
                   if (val instanceof Date) return true;
                   if (typeof val === 'string') {
-                    const d = new Date(val);
-                    return !isNaN(d.getTime());
+                    // Use parseISO to avoid timezone conversion
+                    try {
+                      const d = parseISO(val);
+                      return !isNaN(d.getTime());
+                    } catch {
+                      return false;
+                    }
                   }
                   return false;
                 };
                 const formatToTime = (val: any) => {
-                  if (val instanceof Date) return format(val, 'HH:mm');
+                  if (val instanceof Date) {
+                    // Format without timezone conversion
+                    return formatInTimeZone(val, 'UTC', 'HH:mm');
+                  }
                   if (typeof val === 'string') {
-                    const d = new Date(val);
-                    if (!isNaN(d.getTime())) return format(d, 'HH:mm');
+                    try {
+                      const d = parseISO(val);
+                      if (!isNaN(d.getTime())) {
+                        return formatInTimeZone(d, 'UTC', 'HH:mm');
+                      }
+                    } catch {
+                      // If parseISO fails, try regular Date parsing but be careful
+                      const d = new Date(val);
+                      if (!isNaN(d.getTime())) {
+                        return formatInTimeZone(d, 'UTC', 'HH:mm');
+                      }
+                    }
                   }
                   return String(val);
                 };
@@ -521,7 +546,16 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
             <div className="text-sm font-medium mb-2">Modified Trades</div>
             <div className="space-y-2">
               {comparison.differences.trades.modified
-                .sort((a, b) => new Date(a.trade.timestamp).getTime() - new Date(b.trade.timestamp).getTime())
+                .sort((a, b) => {
+                  // Sort by timestamp without timezone conversion
+                  const timeA = a.trade.timestamp instanceof Date 
+                    ? a.trade.timestamp.getTime() 
+                    : parseISO(a.trade.timestamp).getTime();
+                  const timeB = b.trade.timestamp instanceof Date 
+                    ? b.trade.timestamp.getTime() 
+                    : parseISO(b.trade.timestamp).getTime();
+                  return timeA - timeB;
+                })
                 .map(({ trade, changes }) => renderTrade(trade, true, changes))}
             </div>
           </div>
@@ -648,7 +682,13 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
         <div className="flex items-center justify-between bg-muted/80 rounded-lg px-6 py-3 mb-4 border border-muted-foreground/10 shadow-sm">
           <div className="flex items-center gap-3">
             <span className="font-semibold text-lg">
-              {baseStats.date ? format(new Date(baseStats.date), 'MMM dd, yyyy (EEE)') : ''}
+              {baseStats.date ? (() => {
+                // Format date without timezone conversion
+                const date = typeof baseStats.date === 'string' 
+                  ? parseISO(baseStats.date) 
+                  : baseStats.date;
+                return format(date, 'MMM dd, yyyy (EEE)');
+              })() : ''}
             </span>
             {isVerified && (
               <div className="flex items-center gap-1 text-green-600">

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { TradingCard } from "@/components/trading-card";
 import type { WeekLog, DailyLog } from "@/lib/trading-data-store";
 import { DailyStats } from "@/lib/trading-log-parser";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { TrendingUp, TrendingDown, Target, DollarSign } from "lucide-react";
 
 interface WeeklyLogAccordionProps {
@@ -42,13 +42,8 @@ export function WeeklyLogAccordion({ weeks, notesData, onNotesChange }: WeeklyLo
 
   const transformToDailyStats = (day: DailyLog): DailyStats => {
     const { analysis } = day;
-    // Parse date as local (no UTC shift)
-    const dateParts = day.date.split('-');
-    const localDate = new Date(
-      Number(dateParts[0]),
-      Number(dateParts[1]) - 1,
-      Number(dateParts[2])
-    );
+    // Parse date without timezone conversion using parseISO
+    const localDate = parseISO(day.date);
     return {
       date: localDate,
       totalTrades: analysis.headline.totalTrades,
@@ -131,8 +126,8 @@ export function WeeklyLogAccordion({ weeks, notesData, onNotesChange }: WeeklyLo
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {week.days
                   .sort((a, b) => {
-                    const dateA = new Date(a.date);
-                    const dateB = new Date(b.date);
+                    const dateA = parseISO(a.date);
+                    const dateB = parseISO(b.date);
                     return dateA.getTime() - dateB.getTime();
                   })
                   .map((day) => (

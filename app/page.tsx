@@ -15,6 +15,7 @@ import { ChevronDown, Loader2 } from "lucide-react"
 import { getPnlColor, getTradeSession, getTradeSubSession } from "@/lib/utils"
 import { PnlTrendChart } from "@/components/PnlTrendChart"
 import { DrawdownChart } from "@/components/DrawdownChart"
+import { parseISO } from "date-fns"
 
 // Add PnL formatter utility
 const formatPnL = (value: number) => {
@@ -97,10 +98,9 @@ const groupLogsByDayOfWeek = (logs: DailyLog[]) => {
   };
 
   logs.forEach(log => {
-    // Parse date as UTC to avoid timezone issues
-    const parts = log.date.split('-').map(Number);
-    const date = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
-    const dayOfWeek = date.getUTCDay(); // Sunday - 0, Monday - 1, etc.
+    // Parse date without timezone conversion using parseISO
+    const date = parseISO(log.date);
+    const dayOfWeek = date.getDay(); // Sunday - 0, Monday - 1, etc.
     
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const dayName = dayNames[dayOfWeek];
@@ -112,7 +112,7 @@ const groupLogsByDayOfWeek = (logs: DailyLog[]) => {
 
   // Sort each day's logs by date (newest first) and take only the last 10
   Object.keys(dayOfWeekLogs).forEach(day => {
-    dayOfWeekLogs[day].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    dayOfWeekLogs[day].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
     dayOfWeekLogs[day] = dayOfWeekLogs[day].slice(0, 10); // Keep only last 10
   });
 
@@ -182,7 +182,7 @@ const groupLogsBySession = (logs: DailyLog[]) => {
   });
 
   Object.keys(sessionLogs).forEach(session => {
-    sessionLogs[session].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    sessionLogs[session].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
     sessionLogs[session] = sessionLogs[session].slice(0, 10);
   });
 

@@ -15,7 +15,7 @@ import {
   ReferenceLine,
   ComposedChart
 } from 'recharts'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { useTheme } from 'next-themes'
 
 interface DailyLog {
@@ -46,7 +46,7 @@ const DrawdownTooltip = ({ active, payload, label }: { active?: boolean; payload
     
     return (
       <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
-        <p className="font-medium text-foreground">{format(new Date(label), 'MMM dd, yyyy')}</p>
+        <p className="font-medium text-foreground">{format(parseISO(label), 'MMM dd, yyyy')}</p>
         <div className="space-y-1 mt-2">
           {drawdownData && (
             <p className="text-sm">
@@ -106,7 +106,7 @@ export function DrawdownChart({ dailyLogs }: DrawdownChartProps) {
             <>
               {(() => {
                 const sortedLogs = [...dailyLogs].sort((a, b) => 
-                  new Date(a.date).getTime() - new Date(b.date).getTime()
+                  parseISO(a.date).getTime() - parseISO(b.date).getTime()
                 );
 
                 let cumulativePnl = 0;
@@ -133,7 +133,7 @@ export function DrawdownChart({ dailyLogs }: DrawdownChartProps) {
                       <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
                       <XAxis 
                         dataKey="date" 
-                        tickFormatter={(value) => format(new Date(value), 'MMM dd')}
+                        tickFormatter={(value) => format(parseISO(value), 'MMM dd')}
                         stroke={axisColor}
                         tick={{ fill: axisColor, fontSize: 12 }}
                       />

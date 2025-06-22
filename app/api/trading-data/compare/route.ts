@@ -6,8 +6,19 @@ import { startOfWeek, endOfWeek, format, parseISO } from "date-fns";
 function getWeekKey(dateStr: string) {
   // Weeks start on Monday - use UTC to avoid timezone conversions
   const date = parseISO(dateStr + 'T00:00:00.000Z');
-  const weekStart = startOfWeek(date, { weekStartsOn: 1 });
-  return format(weekStart, "yyyy-MM-dd");
+  
+  // Manual start of week calculation to be timezone-agnostic
+  const day = date.getUTCDay(); // Sunday = 0, Monday = 1
+  const diff = day === 0 ? -6 : 1 - day; // Adjust to Monday
+  const weekStartDate = new Date(date.getTime());
+  weekStartDate.setUTCDate(date.getUTCDate() + diff);
+
+  // Format to yyyy-MM-dd manually from UTC parts
+  const year = weekStartDate.getUTCFullYear();
+  const month = (weekStartDate.getUTCMonth() + 1).toString().padStart(2, '0');
+  const dayOfMonth = weekStartDate.getUTCDate().toString().padStart(2, '0');
+  
+  return `${year}-${month}-${dayOfMonth}`;
 }
 
 export async function GET() {
@@ -50,8 +61,10 @@ export async function GET() {
         ...baseDays.map((d: DailyLog) => d.date)
       ])).sort();
       // Find week start and end
-      const weekStartDate = startOfWeek(parseISO(allDates[0] + 'T00:00:00.000Z'), { weekStartsOn: 1 });
-      const weekEndDate = endOfWeek(parseISO(allDates[0] + 'T00:00:00.000Z'), { weekStartsOn: 1 });
+      const weekStartDate = parseISO(weekKey + 'T00:00:00.000Z');
+      const weekEndDate = new Date(weekStartDate.getTime());
+      weekEndDate.setUTCDate(weekStartDate.getUTCDate() + 6);
+
       // Build days array for compare and base
       const compareDaysMap = new Map<string, DailyLog>(compareDays.map((d: DailyLog) => [d.date, d]));
       const baseDaysMap = new Map<string, DailyLog>(baseDays.map((d: DailyLog) => [d.date, d]));
@@ -83,8 +96,13 @@ export async function GET() {
       const baseHeadline = calcHeadline(days, 'baseAnalysis');
       // Return WeekLog for this week
       return {
-        weekStart: format(weekStartDate, "yyyy-MM-dd"),
-        weekEnd: format(weekEndDate, "yyyy-MM-dd"),
+        weekStart: weekKey,
+        weekEnd: (() => {
+          const year = weekEndDate.getUTCFullYear();
+          const month = (weekEndDate.getUTCMonth() + 1).toString().padStart(2, '0');
+          const day = weekEndDate.getUTCDate().toString().padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        })(),
         days: days.map(d => ({
           date: d.date,
           compareAnalysis: d.compareAnalysis,
