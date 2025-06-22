@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -36,7 +36,7 @@ export async function GET() {
           exists: true,
           lastModified: stats.mtime.toISOString()
         });
-      } catch (error) {
+      } catch {
         // File doesn't exist
         fileInfo.push({
           name: file.name,

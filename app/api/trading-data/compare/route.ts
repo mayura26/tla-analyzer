@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { tradingDataStore, DailyLog } from '@/lib/trading-data-store';
 import { parseTradingLog } from '@/lib/trading-log-parser';
-import { startOfWeek, endOfWeek, format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
 
 function getWeekKey(dateStr: string) {
   // Weeks start on Monday - use UTC to avoid timezone conversions
