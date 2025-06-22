@@ -679,27 +679,63 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
           <DialogTitle>Detailed Comparison</DialogTitle>
         </DialogHeader>
         {/* Styled header bar for date and PnL diff */}
-        <div className="flex items-center justify-between bg-muted/80 rounded-lg px-6 py-3 mb-4 border border-muted-foreground/10 shadow-sm">
-          <div className="flex items-center gap-3">
-            <span className="font-semibold text-lg">
-              {baseStats.date ? (() => {
-                // Format date without timezone conversion
-                const date = typeof baseStats.date === 'string' 
-                  ? parseISO(baseStats.date) 
-                  : baseStats.date;
-                return format(date, 'MMM dd, yyyy (EEE)');
-              })() : ''}
+        <div className="bg-muted/80 rounded-lg px-6 py-4 mb-4 border border-muted-foreground/10 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <span className="font-semibold text-lg">
+                {baseStats.date ? (() => {
+                  // Format date without timezone conversion
+                  const date = typeof baseStats.date === 'string' 
+                    ? parseISO(baseStats.date) 
+                    : baseStats.date;
+                  return format(date, 'MMM dd, yyyy (EEE)');
+                })() : ''}
+              </span>
+              {isVerified && (
+                <div className="flex items-center gap-1 text-green-600">
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span className="text-sm font-medium">Verified</span>
+                </div>
+              )}
+            </div>
+            <span className={`font-bold text-lg ${getPnlColor(compareStats.totalPnl - baseStats.totalPnl)}`}> 
+              {formatCurrency(compareStats.totalPnl - baseStats.totalPnl)}
             </span>
-            {isVerified && (
-              <div className="flex items-center gap-1 text-green-600">
-                <CheckCircle2 className="w-5 h-5" />
-                <span className="text-sm font-medium">Verified</span>
-              </div>
-            )}
           </div>
-          <span className={`font-bold text-lg ${getPnlColor(compareStats.totalPnl - baseStats.totalPnl)}`}> 
-            {formatCurrency(compareStats.totalPnl - baseStats.totalPnl)}
-          </span>
+          
+          <div className="grid grid-cols-2 gap-4">
+            {/* PnL Card */}
+            <div className="bg-background/50 rounded-lg p-3 border border-muted-foreground/20">
+              <div className="text-sm text-muted-foreground mb-1">PnL</div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Old</span>
+                <span>New</span>
+              </div>
+              <div className="flex items-center justify-between mt-1 text-lg">
+                <span className={`font-semibold ${getPnlColor(baseStats.totalPnl)}`}>
+                  {formatCurrency(baseStats.totalPnl)}
+                </span>
+                <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                <span className={`font-semibold ${getPnlColor(compareStats.totalPnl)}`}>
+                  {formatCurrency(compareStats.totalPnl)}
+                </span>
+              </div>
+            </div>
+            
+            {/* Win/Loss Card */}
+            <div className="bg-background/50 rounded-lg p-3 border border-muted-foreground/20">
+              <div className="text-sm text-muted-foreground mb-1">Win/Loss Record</div>
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>Old</span>
+                <span>New</span>
+              </div>
+              <div className="flex items-center justify-between mt-1 text-lg font-semibold">
+                <span>{baseStats.wins}-{baseStats.losses}</span>
+                <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                <span>{compareStats.wins}-{compareStats.losses}</span>
+              </div>
+            </div>
+          </div>
         </div>
         <Tabs defaultValue="sessions">
           <TabsList>
