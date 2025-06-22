@@ -18,7 +18,7 @@ const subSessionTimes: { [key: string]: { start: string, end: string } } = {
 
 export function getTradeSession(timestamp: string): string | null {
   const tradeTime = new Date(timestamp);
-  const timeString = tradeTime.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' });
+  const timeString = tradeTime.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
 
   for (const session in sessionTimes) {
     const { start, end } = sessionTimes[session];
@@ -31,7 +31,7 @@ export function getTradeSession(timestamp: string): string | null {
 
 export function getTradeSubSession(timestamp: string): string | null {
   const tradeTime = new Date(timestamp);
-  const timeString = tradeTime.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' });
+  const timeString = tradeTime.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
 
   for (const session in subSessionTimes) {
     const { start, end } = subSessionTimes[session];

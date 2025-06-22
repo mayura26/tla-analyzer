@@ -4,18 +4,37 @@ import { useEffect, useState } from "react";
 import { CompareWeeklyAccordion } from "@/components/CompareWeeklyAccordion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, ChevronDown, ChevronUp, DollarSign, Target, TrendingUp, TrendingDown } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronUp, DollarSign, Target, TrendingUp, TrendingDown, EyeOff } from "lucide-react";
 import { ComparisonStats } from "@/lib/trading-comparison-stats-processor";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 export default function CompareViewPage() {
   const [weeks, setWeeks] = useState<any[]>([]);
   const [stats, setStats] = useState<ComparisonStats | null>(null);
+  const [filteredStats, setFilteredStats] = useState<ComparisonStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statsExpanded, setStatsExpanded] = useState(false);
+  const [showOnlyUnverified, setShowOnlyUnverified] = useState(false);
+
+  // Filter weeks to show only those with unverified days when filter is enabled
+  const filteredWeeks = showOnlyUnverified 
+    ? weeks.map(week => ({
+        ...week,
+        days: week.days.filter((day: any) => {
+          // Show day if it has no metadata or if verified is false/undefined
+          return !day.metadata || !day.metadata.verified;
+        })
+      })).filter(week => week.days.length > 0) // Remove weeks with no unverified days
+    : weeks;
+
+  // Use filtered stats when filter is enabled
+  const displayStats = showOnlyUnverified ? filteredStats : stats;
 
   const fetchData = async () => {
     try {
@@ -42,6 +61,72 @@ export default function CompareViewPage() {
 
       setWeeks(weeksData);
       setStats(statsData);
+      
+      // Calculate filtered stats for unverified days only
+      if (weeksData.length > 0) {
+        const unverifiedDays = weeksData.flatMap(week => 
+          week.days.filter((day: any) => !day.metadata || !day.metadata.verified)
+        );
+        
+        if (unverifiedDays.length > 0) {
+          // Create a simplified stats object for unverified days
+          const totalComparePnl = unverifiedDays.reduce((sum, day) => sum + (day.compareAnalysis?.headline?.totalPnl || 0), 0);
+          const totalBasePnl = unverifiedDays.reduce((sum, day) => sum + (day.baseAnalysis?.headline?.totalPnl || 0), 0);
+          const totalCompareTrades = unverifiedDays.reduce((sum, day) => sum + (day.compareAnalysis?.headline?.totalTrades || 0), 0);
+          const totalBaseTrades = unverifiedDays.reduce((sum, day) => sum + (day.baseAnalysis?.headline?.totalTrades || 0), 0);
+          const totalWinsDiff = unverifiedDays.reduce((sum, day) => {
+            const compareWins = day.compareAnalysis?.headline?.wins || 0;
+            const baseWins = day.baseAnalysis?.headline?.wins || 0;
+            return sum + (compareWins - baseWins);
+          }, 0);
+          const totalLossesDiff = unverifiedDays.reduce((sum, day) => {
+            const compareLosses = day.compareAnalysis?.headline?.losses || 0;
+            const baseLosses = day.baseAnalysis?.headline?.losses || 0;
+            return sum + (compareLosses - baseLosses);
+          }, 0);
+          
+          const unverifiedStats: ComparisonStats = {
+            totalPnlDiff: totalComparePnl - totalBasePnl,
+            avgPnlDiffPerWeek: (totalComparePnl - totalBasePnl) / Math.max(1, Math.ceil(unverifiedDays.length / 7)),
+            totalTradesDiff: totalCompareTrades - totalBaseTrades,
+            avgTradesDiffPerWeek: (totalCompareTrades - totalBaseTrades) / Math.max(1, Math.ceil(unverifiedDays.length / 7)),
+            totalWinsDiff,
+            totalLossesDiff,
+            totalBigWinsDiff: unverifiedDays.reduce((sum, day) => {
+              const compareBigWins = day.compareAnalysis?.headline?.bigWins || 0;
+              const baseBigWins = day.baseAnalysis?.headline?.bigWins || 0;
+              return sum + (compareBigWins - baseBigWins);
+            }, 0),
+            totalBigLossesDiff: unverifiedDays.reduce((sum, day) => {
+              const compareBigLosses = day.compareAnalysis?.headline?.bigLosses || 0;
+              const baseBigLosses = day.baseAnalysis?.headline?.bigLosses || 0;
+              return sum + (compareBigLosses - baseBigLosses);
+            }, 0),
+            totalWeeks: Math.ceil(unverifiedDays.length / 7),
+            totalCompareTrades,
+            totalBaseTrades,
+            totalComparePnl,
+            totalBasePnl,
+            winRateDiff: 0, // Simplified for unverified filter
+            compareWinRate: totalCompareTrades > 0 ? (totalWinsDiff + totalBaseTrades * 0.5) / totalCompareTrades * 100 : 0,
+            baseWinRate: totalBaseTrades > 0 ? (totalWinsDiff + totalBaseTrades * 0.5) / totalBaseTrades * 100 : 0,
+            compareAvgPnlPerTrade: totalCompareTrades > 0 ? totalComparePnl / totalCompareTrades : 0,
+            baseAvgPnlPerTrade: totalBaseTrades > 0 ? totalBasePnl / totalBaseTrades : 0,
+            pnlDiffPerTrade: (totalCompareTrades > 0 ? totalComparePnl / totalCompareTrades : 0) - (totalBaseTrades > 0 ? totalBasePnl / totalBaseTrades : 0),
+            // Simplified breakdowns for unverified days
+            compareWinDrawLoss: { wins: 0, draws: 0, losses: 0, breakdown: "0-0-0" },
+            baseWinDrawLoss: { wins: 0, draws: 0, losses: 0, breakdown: "0-0-0" },
+            compareGreenRed: { greenDays: 0, redDays: 0 },
+            baseGreenRed: { greenDays: 0, redDays: 0 },
+            comparePnlDistribution: { bigWins: 0, highProfitDays: 0, lowProfitDays: 0, lowLossDays: 0, highLossDays: 0, bigLosses: 0 },
+            basePnlDistribution: { bigWins: 0, highProfitDays: 0, lowProfitDays: 0, lowLossDays: 0, highLossDays: 0, bigLosses: 0 }
+          };
+          
+          setFilteredStats(unverifiedStats);
+        } else {
+          setFilteredStats(null);
+        }
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : "Failed to load comparison data");
     } finally {
@@ -132,6 +217,24 @@ export default function CompareViewPage() {
     <div className="container mx-auto p-4">
       <div className="mb-8">
         <h1 className="text-4xl font-bold mb-4">Trading Levels Algo Comparison</h1>
+        
+        {/* Filter Controls */}
+        <div className="flex items-center space-x-2 mb-4">
+          <Switch
+            id="unverified-filter"
+            checked={showOnlyUnverified}
+            onCheckedChange={setShowOnlyUnverified}
+          />
+          <Label htmlFor="unverified-filter" className="flex items-center gap-2 cursor-pointer">
+            <EyeOff className="w-4 h-4" />
+            Show only unverified days
+          </Label>
+          {showOnlyUnverified && (
+            <Badge variant="secondary" className="ml-2">
+              {filteredWeeks.reduce((total, week) => total + week.days.length, 0)} unverified days
+            </Badge>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -176,83 +279,83 @@ export default function CompareViewPage() {
                 {statsExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
               </div>
             </CardHeader>
-            {statsExpanded && stats && (
+            {statsExpanded && displayStats && (
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {/* Total PnL Difference */}
-                  <div className={`space-y-2 p-4 rounded-lg border ${getImprovementColor(stats.totalPnlDiff, 0)}`}>
+                  <div className={`space-y-2 p-4 rounded-lg border ${getImprovementColor(displayStats.totalPnlDiff, 0)}`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <DollarSign className="w-4 h-4 text-muted-foreground" />
                         <span className="text-sm font-medium text-muted-foreground">Total PnL Difference</span>
                       </div>
-                      {stats.totalPnlDiff !== 0 && (
+                      {displayStats.totalPnlDiff !== 0 && (
                         <div className="flex items-center gap-1 text-xs font-medium">
-                          {stats.totalPnlDiff > 0 ? (
-                            <span className="text-green-600">+{formatCurrency(stats.totalPnlDiff)}</span>
+                          {displayStats.totalPnlDiff > 0 ? (
+                            <span className="text-green-600">+{formatCurrency(displayStats.totalPnlDiff)}</span>
                           ) : (
-                            <span className="text-red-600">{formatCurrency(stats.totalPnlDiff)}</span>
+                            <span className="text-red-600">{formatCurrency(displayStats.totalPnlDiff)}</span>
                           )}
                         </div>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      {getPnlIcon(stats.totalPnlDiff)}
-                      <span className={`text-2xl font-bold ${getPnlColor(stats.totalPnlDiff)}`}>
-                        {formatCurrency(stats.totalPnlDiff)}
+                      {getPnlIcon(displayStats.totalPnlDiff)}
+                      <span className={`text-2xl font-bold ${getPnlColor(displayStats.totalPnlDiff)}`}>
+                        {formatCurrency(displayStats.totalPnlDiff)}
                       </span>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Avg: {formatCurrency(stats.avgPnlDiffPerWeek)}/week
+                      Avg: {formatCurrency(displayStats.avgPnlDiffPerWeek)}/week
                     </div>
                   </div>
 
                   {/* Total Trades Difference */}
-                  <div className={`space-y-2 p-4 rounded-lg border ${getImprovementColor(stats.totalTradesDiff, 0)}`}>
+                  <div className={`space-y-2 p-4 rounded-lg border ${getImprovementColor(displayStats.totalTradesDiff, 0)}`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Target className="w-4 h-4 text-muted-foreground" />
                         <span className="text-sm font-medium text-muted-foreground">Total Trades Difference</span>
                       </div>
-                      {stats.totalTradesDiff !== 0 && (
+                      {displayStats.totalTradesDiff !== 0 && (
                         <div className="flex items-center gap-1 text-xs font-medium">
-                          {stats.totalTradesDiff > 0 ? (
-                            <span className="text-blue-600">+{stats.totalTradesDiff}</span>
+                          {displayStats.totalTradesDiff > 0 ? (
+                            <span className="text-blue-600">+{displayStats.totalTradesDiff}</span>
                           ) : (
-                            <span className="text-orange-600">{stats.totalTradesDiff}</span>
+                            <span className="text-orange-600">{displayStats.totalTradesDiff}</span>
                           )}
                         </div>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`text-2xl font-bold ${stats.totalTradesDiff >= 0 ? 'text-blue-500' : 'text-orange-500'}`}>
-                        {stats.totalTradesDiff >= 0 ? '+' : ''}{stats.totalTradesDiff}
+                      <span className={`text-2xl font-bold ${displayStats.totalTradesDiff >= 0 ? 'text-blue-500' : 'text-orange-500'}`}>
+                        {displayStats.totalTradesDiff >= 0 ? '+' : ''}{displayStats.totalTradesDiff}
                       </span>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Avg: {stats.avgTradesDiffPerWeek >= 0 ? '+' : ''}{stats.avgTradesDiffPerWeek.toFixed(1)}/week
+                      Avg: {displayStats.avgTradesDiffPerWeek >= 0 ? '+' : ''}{displayStats.avgTradesDiffPerWeek.toFixed(1)}/week
                     </div>
                   </div>
 
                   {/* Win/Loss Breakdown */}
-                  <div className={`space-y-2 p-4 rounded-lg border ${getImprovementColor(stats.totalWinsDiff, 0)}`}>
+                  <div className={`space-y-2 p-4 rounded-lg border ${getImprovementColor(displayStats.totalWinsDiff, 0)}`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Target className="w-4 h-4 text-muted-foreground" />
                         <span className="text-sm font-medium text-muted-foreground">Win/Loss Difference</span>
                       </div>
-                      {getImprovementIndicator(stats.totalWinsDiff, 0)}
+                      {getImprovementIndicator(displayStats.totalWinsDiff, 0)}
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-center">
                         <div className="text-lg font-bold text-green-500">
-                          +{stats.totalWinsDiff}
+                          +{displayStats.totalWinsDiff}
                         </div>
                         <div className="text-xs text-muted-foreground">Wins</div>
                       </div>
                       <div className="text-center">
                         <div className="text-lg font-bold text-red-500">
-                          {stats.totalLossesDiff >= 0 ? '+' : ''}{stats.totalLossesDiff}
+                          {displayStats.totalLossesDiff >= 0 ? '+' : ''}{displayStats.totalLossesDiff}
                         </div>
                         <div className="text-xs text-muted-foreground">Losses</div>
                       </div>
@@ -260,24 +363,24 @@ export default function CompareViewPage() {
                   </div>
 
                   {/* Big Wins/Losses Breakdown */}
-                  <div className={`space-y-2 p-4 rounded-lg border ${getImprovementColor(stats.totalBigWinsDiff, 0)}`}>
+                  <div className={`space-y-2 p-4 rounded-lg border ${getImprovementColor(displayStats.totalBigWinsDiff, 0)}`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Target className="w-4 h-4 text-muted-foreground" />
                         <span className="text-sm font-medium text-muted-foreground">Big Wins/Losses</span>
                       </div>
-                      {getImprovementIndicator(stats.totalBigWinsDiff, 0)}
+                      {getImprovementIndicator(displayStats.totalBigWinsDiff, 0)}
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-center">
                         <div className="text-lg font-bold text-green-600">
-                          {stats.totalBigWinsDiff >= 0 ? '+' : ''}{stats.totalBigWinsDiff}
+                          {displayStats.totalBigWinsDiff >= 0 ? '+' : ''}{displayStats.totalBigWinsDiff}
                         </div>
                         <div className="text-xs text-muted-foreground">Big Wins</div>
                       </div>
                       <div className="text-center">
                         <div className="text-lg font-bold text-red-600">
-                          {stats.totalBigLossesDiff >= 0 ? '+' : ''}{stats.totalBigLossesDiff}
+                          {displayStats.totalBigLossesDiff >= 0 ? '+' : ''}{displayStats.totalBigLossesDiff}
                         </div>
                         <div className="text-xs text-muted-foreground">Big Losses</div>
                       </div>
@@ -288,10 +391,10 @@ export default function CompareViewPage() {
                 {/* Visual Comparison Metrics */}
                 <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {/* Win/Draw/Loss Comparison */}
-                  <div className={`space-y-3 p-4 rounded-lg border ${getImprovementColor(stats.compareWinDrawLoss.wins, stats.baseWinDrawLoss.wins)}`}>
+                  <div className={`space-y-3 p-4 rounded-lg border ${getImprovementColor(displayStats.compareWinDrawLoss.wins, displayStats.baseWinDrawLoss.wins)}`}>
                     <div className="flex items-center justify-between">
                       <div className="text-sm font-medium text-muted-foreground">Win/Draw/Loss Comparison</div>
-                      {getImprovementIndicator(stats.compareWinDrawLoss.wins, stats.baseWinDrawLoss.wins)}
+                      {getImprovementIndicator(displayStats.compareWinDrawLoss.wins, displayStats.baseWinDrawLoss.wins)}
                     </div>
 
                     {/* Compare Data */}
@@ -299,19 +402,19 @@ export default function CompareViewPage() {
                       <div className="text-xs font-medium text-blue-600">Compare Data</div>
                       <div className="flex items-center space-x-1">
                         <div className="h-4 bg-green-600 rounded" style={{
-                          width: `${((stats.compareWinDrawLoss.wins) / (stats.totalCompareTrades || 1)) * 100}%`
+                          width: `${((displayStats.compareWinDrawLoss.wins) / (displayStats.totalCompareTrades || 1)) * 100}%`
                         }} />
                         <div className="h-4 bg-gray-400 rounded" style={{
-                          width: `${((stats.compareWinDrawLoss.draws) / (stats.totalCompareTrades || 1)) * 100}%`
+                          width: `${((displayStats.compareWinDrawLoss.draws) / (displayStats.totalCompareTrades || 1)) * 100}%`
                         }} />
                         <div className="h-4 bg-red-600 rounded" style={{
-                          width: `${((stats.compareWinDrawLoss.losses) / (stats.totalCompareTrades || 1)) * 100}%`
+                          width: `${((displayStats.compareWinDrawLoss.losses) / (displayStats.totalCompareTrades || 1)) * 100}%`
                         }} />
                       </div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-green-600">{stats.compareWinDrawLoss.wins}</span>
-                        <span className="text-gray-400">{stats.compareWinDrawLoss.draws}</span>
-                        <span className="text-red-600">{stats.compareWinDrawLoss.losses}</span>
+                        <span className="text-green-600">{displayStats.compareWinDrawLoss.wins}</span>
+                        <span className="text-gray-400">{displayStats.compareWinDrawLoss.draws}</span>
+                        <span className="text-red-600">{displayStats.compareWinDrawLoss.losses}</span>
                       </div>
                     </div>
 
@@ -320,28 +423,28 @@ export default function CompareViewPage() {
                       <div className="text-xs font-medium text-orange-600">Base Data</div>
                       <div className="flex items-center space-x-1">
                         <div className="h-4 bg-green-600 rounded" style={{
-                          width: `${((stats.baseWinDrawLoss.wins) / (stats.totalBaseTrades || 1)) * 100}%`
+                          width: `${((displayStats.baseWinDrawLoss.wins) / (displayStats.totalBaseTrades || 1)) * 100}%`
                         }} />
                         <div className="h-4 bg-gray-400 rounded" style={{
-                          width: `${((stats.baseWinDrawLoss.draws) / (stats.totalBaseTrades || 1)) * 100}%`
+                          width: `${((displayStats.baseWinDrawLoss.draws) / (displayStats.totalBaseTrades || 1)) * 100}%`
                         }} />
                         <div className="h-4 bg-red-600 rounded" style={{
-                          width: `${((stats.baseWinDrawLoss.losses) / (stats.totalBaseTrades || 1)) * 100}%`
+                          width: `${((displayStats.baseWinDrawLoss.losses) / (displayStats.totalBaseTrades || 1)) * 100}%`
                         }} />
                       </div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-green-600">{stats.baseWinDrawLoss.wins}</span>
-                        <span className="text-gray-400">{stats.baseWinDrawLoss.draws}</span>
-                        <span className="text-red-600">{stats.baseWinDrawLoss.losses}</span>
+                        <span className="text-green-600">{displayStats.baseWinDrawLoss.wins}</span>
+                        <span className="text-gray-400">{displayStats.baseWinDrawLoss.draws}</span>
+                        <span className="text-red-600">{displayStats.baseWinDrawLoss.losses}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Green vs Red Days Comparison */}
-                  <div className={`space-y-3 p-4 rounded-lg border ${getImprovementColor(stats.compareGreenRed.greenDays, stats.baseGreenRed.greenDays)}`}>
+                  <div className={`space-y-3 p-4 rounded-lg border ${getImprovementColor(displayStats.compareGreenRed.greenDays, displayStats.baseGreenRed.greenDays)}`}>
                     <div className="flex items-center justify-between">
                       <div className="text-sm font-medium text-muted-foreground">Green vs Red Days</div>
-                      {getImprovementIndicator(stats.compareGreenRed.greenDays, stats.baseGreenRed.greenDays)}
+                      {getImprovementIndicator(displayStats.compareGreenRed.greenDays, displayStats.baseGreenRed.greenDays)}
                     </div>
 
                     {/* Compare Data */}
@@ -349,15 +452,15 @@ export default function CompareViewPage() {
                       <div className="text-xs font-medium text-blue-600">Compare Data</div>
                       <div className="flex items-center space-x-1">
                         <div className="h-4 bg-green-600 rounded" style={{
-                          width: `${((stats.compareGreenRed.greenDays) / (stats.compareGreenRed.greenDays + stats.compareGreenRed.redDays || 1)) * 100}%`
+                          width: `${((displayStats.compareGreenRed.greenDays) / (displayStats.compareGreenRed.greenDays + displayStats.compareGreenRed.redDays || 1)) * 100}%`
                         }} />
                         <div className="h-4 bg-red-600 rounded" style={{
-                          width: `${((stats.compareGreenRed.redDays) / (stats.compareGreenRed.greenDays + stats.compareGreenRed.redDays || 1)) * 100}%`
+                          width: `${((displayStats.compareGreenRed.redDays) / (displayStats.compareGreenRed.greenDays + displayStats.compareGreenRed.redDays || 1)) * 100}%`
                         }} />
                       </div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-green-600">{stats.compareGreenRed.greenDays} profitable</span>
-                        <span className="text-red-600">{stats.compareGreenRed.redDays} non-profitable</span>
+                        <span className="text-green-600">{displayStats.compareGreenRed.greenDays} profitable</span>
+                        <span className="text-red-600">{displayStats.compareGreenRed.redDays} non-profitable</span>
                       </div>
                     </div>
 
@@ -366,40 +469,40 @@ export default function CompareViewPage() {
                       <div className="text-xs font-medium text-orange-600">Base Data</div>
                       <div className="flex items-center space-x-1">
                         <div className="h-4 bg-green-600 rounded" style={{
-                          width: `${((stats.baseGreenRed.greenDays) / (stats.baseGreenRed.greenDays + stats.baseGreenRed.redDays || 1)) * 100}%`
+                          width: `${((displayStats.baseGreenRed.greenDays) / (displayStats.baseGreenRed.greenDays + displayStats.baseGreenRed.redDays || 1)) * 100}%`
                         }} />
                         <div className="h-4 bg-red-600 rounded" style={{
-                          width: `${((stats.baseGreenRed.redDays) / (stats.baseGreenRed.greenDays + stats.baseGreenRed.redDays || 1)) * 100}%`
+                          width: `${((displayStats.baseGreenRed.redDays) / (displayStats.baseGreenRed.greenDays + displayStats.baseGreenRed.redDays || 1)) * 100}%`
                         }} />
                       </div>
                       <div className="flex justify-between text-xs">
-                        <span className="text-green-600">{stats.baseGreenRed.greenDays} profitable</span>
-                        <span className="text-red-600">{stats.baseGreenRed.redDays} non-profitable</span>
+                        <span className="text-green-600">{displayStats.baseGreenRed.greenDays} profitable</span>
+                        <span className="text-red-600">{displayStats.baseGreenRed.redDays} non-profitable</span>
                       </div>
                     </div>
                   </div>
 
                   {/* PnL Distribution Comparison */}
                   <div className={`space-y-3 p-4 rounded-lg border ${getImprovementColor(
-                    stats.comparePnlDistribution.bigWins + stats.comparePnlDistribution.highProfitDays,
-                    stats.basePnlDistribution.bigWins + stats.basePnlDistribution.highProfitDays
+                    displayStats.comparePnlDistribution.bigWins + displayStats.comparePnlDistribution.highProfitDays,
+                    displayStats.basePnlDistribution.bigWins + displayStats.basePnlDistribution.highProfitDays
                   )}`}>
                     <div className="flex items-center justify-between">
                       <div className="text-sm font-medium text-muted-foreground">Daily PnL Distribution</div>
                       {getImprovementIndicator(
-                        stats.comparePnlDistribution.bigWins + stats.comparePnlDistribution.highProfitDays,
-                        stats.basePnlDistribution.bigWins + stats.basePnlDistribution.highProfitDays
+                        displayStats.comparePnlDistribution.bigWins + displayStats.comparePnlDistribution.highProfitDays,
+                        displayStats.basePnlDistribution.bigWins + displayStats.basePnlDistribution.highProfitDays
                       )}
                     </div>
 
                     <div className="space-y-4">
                       {[
-                        { label: '>$400', compareCount: stats.comparePnlDistribution.bigWins, baseCount: stats.basePnlDistribution.bigWins, className: 'bg-green-600' },
-                        { label: '$100-$400', compareCount: stats.comparePnlDistribution.highProfitDays, baseCount: stats.basePnlDistribution.highProfitDays, className: 'bg-green-500' },
-                        { label: '$0-$100', compareCount: stats.comparePnlDistribution.lowProfitDays, baseCount: stats.basePnlDistribution.lowProfitDays, className: 'bg-green-400' },
-                        { label: '-$100-$0', compareCount: stats.comparePnlDistribution.lowLossDays, baseCount: stats.basePnlDistribution.lowLossDays, className: 'bg-red-400' },
-                        { label: '-$400..-$100', compareCount: stats.comparePnlDistribution.highLossDays, baseCount: stats.basePnlDistribution.highLossDays, className: 'bg-red-500' },
-                        { label: '<-$400', compareCount: stats.comparePnlDistribution.bigLosses, baseCount: stats.basePnlDistribution.bigLosses, className: 'bg-red-600' },
+                        { label: '>$400', compareCount: displayStats.comparePnlDistribution.bigWins, baseCount: displayStats.basePnlDistribution.bigWins, className: 'bg-green-600' },
+                        { label: '$100-$400', compareCount: displayStats.comparePnlDistribution.highProfitDays, baseCount: displayStats.basePnlDistribution.highProfitDays, className: 'bg-green-500' },
+                        { label: '$0-$100', compareCount: displayStats.comparePnlDistribution.lowProfitDays, baseCount: displayStats.basePnlDistribution.lowProfitDays, className: 'bg-green-400' },
+                        { label: '-$100-$0', compareCount: displayStats.comparePnlDistribution.lowLossDays, baseCount: displayStats.basePnlDistribution.lowLossDays, className: 'bg-red-400' },
+                        { label: '-$400..-$100', compareCount: displayStats.comparePnlDistribution.highLossDays, baseCount: displayStats.basePnlDistribution.highLossDays, className: 'bg-red-500' },
+                        { label: '<-$400', compareCount: displayStats.comparePnlDistribution.bigLosses, baseCount: displayStats.basePnlDistribution.bigLosses, className: 'bg-red-600' },
                       ].map((item, index) => {
                         const maxCount = Math.max(item.compareCount || 0, item.baseCount || 0, 1);
                         return (
@@ -441,15 +544,15 @@ export default function CompareViewPage() {
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Weeks:</span>
-                        <span className="font-medium">{stats.totalWeeks}</span>
+                        <span className="font-medium">{displayStats.totalWeeks}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Compare Trades:</span>
-                        <span className="font-medium">{stats.totalCompareTrades}</span>
+                        <span className="font-medium">{displayStats.totalCompareTrades}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Base Trades:</span>
-                        <span className="font-medium">{stats.totalBaseTrades}</span>
+                        <span className="font-medium">{displayStats.totalBaseTrades}</span>
                       </div>
                     </div>
                   </div>
@@ -458,7 +561,7 @@ export default function CompareViewPage() {
             )}
           </Card>
 
-          <CompareWeeklyAccordion weeks={weeks} onWeekMerged={handleWeekMerged} />
+          <CompareWeeklyAccordion weeks={filteredWeeks} onWeekMerged={handleWeekMerged} />
         </>
       )}
       <div className="mb-24" />

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { WeeklyLogAccordion } from "@/components/WeeklyLogAccordion";
+import { QuarterlyLogAccordion } from "@/components/QuarterlyLogAccordion";
 import type { WeekLog, NotesData } from "@/lib/trading-data-store";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -96,7 +96,7 @@ export default function Home() {
           </CardContent>
         </Card>
       ) : (
-        <WeeklyLogAccordion weeks={weeks} notesData={notesData} onNotesChange={handleNotesChange} />
+        <QuarterlyLogAccordion weeks={weeks} notesData={notesData} onNotesChange={handleNotesChange} />
       )}
       <div className="mb-24" />
     </div>
