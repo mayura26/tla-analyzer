@@ -10,8 +10,12 @@ export async function GET() {
       tradingDataStore.getAllDays()
     ]);
 
-    // Calculate comparison stats using the processor
-    const stats = TradingComparisonStatsProcessor.calculateComparisonStats(compareData, baseData);
+    // Extract dates from compareData to filter baseData
+    const compareDates = new Set(compareData.map(day => day.date));
+    const filteredBaseData = baseData.filter(day => compareDates.has(day.date));
+
+    // Calculate comparison stats using the processor with filtered base data
+    const stats = TradingComparisonStatsProcessor.calculateComparisonStats(compareData, filteredBaseData);
 
     return NextResponse.json(stats);
   } catch (error) {

@@ -14,6 +14,7 @@ import {
 import { ChevronDown, Loader2 } from "lucide-react"
 import { getPnlColor, getTradeSession, getTradeSubSession } from "@/lib/utils"
 import { PnlTrendChart } from "@/components/PnlTrendChart"
+import { DrawdownChart } from "@/components/DrawdownChart"
 
 // Add PnL formatter utility
 const formatPnL = (value: number) => {
@@ -270,6 +271,9 @@ export default function Home() {
 
       {/* PnL Trend Chart */}
       <PnlTrendChart dailyLogs={dashboardData?.dailyLogs || []} />
+
+      {/* Drawdown Chart */}
+      <DrawdownChart dailyLogs={dashboardData?.dailyLogs || []} />
 
       {/* Trading Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
