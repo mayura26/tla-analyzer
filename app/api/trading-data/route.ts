@@ -28,7 +28,8 @@ export async function POST(request: Request) {
     const parsedData = parseTradingLog(logData);
     // Always extract the date from the log text (first YYYY-MM-DD found)
     const match = logData.match(/(\d{4}-\d{2}-\d{2})/);
-    const date = match ? match[1] : new Date().toISOString().split('T')[0];
+    // Use UTC date to avoid timezone conversions
+    const date = match ? match[1] : new Date().toISOString().slice(0, 10);
     await tradingDataStore.addDailyLog({
       date,
       analysis: parsedData

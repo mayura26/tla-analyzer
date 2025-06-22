@@ -297,11 +297,11 @@ class TradingDataStore {
 
     function getWeekStart(dateStr: string) {
       const [year, month, day] = dateStr.split('-').map(Number);
-      const d = new Date(year, month - 1, day);
-      const dayOfWeek = d.getDay();
-      const diff = d.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-      const monday = new Date(d);
-      monday.setDate(diff);
+      // Use UTC to avoid timezone conversions
+      const d = new Date(Date.UTC(year, month - 1, day));
+      const dayOfWeek = d.getUTCDay();
+      const diff = d.getUTCDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      const monday = new Date(Date.UTC(year, month - 1, diff));
       return monday.toISOString().split('T')[0];
     }
 
@@ -314,8 +314,9 @@ class TradingDataStore {
 
     const weekLogs: WeekLog[] = Object.entries(weekMap).map(([weekStart, days]) => {
       days.sort((a, b) => b.date.localeCompare(a.date));
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekEnd.getDate() + 6);
+      // Use UTC to avoid timezone conversions
+      const [year, month, day] = weekStart.split('-').map(Number);
+      const weekEnd = new Date(Date.UTC(year, month - 1, day + 6));
       const weekHeadline = days.reduce((acc, d) => {
         acc.totalPnl = (acc.totalPnl || 0) + (d.analysis.headline.totalPnl || 0);
         acc.totalTrades = (acc.totalTrades || 0) + (d.analysis.headline.totalTrades || 0);

@@ -4,8 +4,8 @@ import { parseTradingLog } from '@/lib/trading-log-parser';
 import { startOfWeek, endOfWeek, format, parseISO } from "date-fns";
 
 function getWeekKey(dateStr: string) {
-  // Weeks start on Monday
-  const date = parseISO(dateStr);
+  // Weeks start on Monday - use UTC to avoid timezone conversions
+  const date = parseISO(dateStr + 'T00:00:00.000Z');
   const weekStart = startOfWeek(date, { weekStartsOn: 1 });
   return format(weekStart, "yyyy-MM-dd");
 }
@@ -50,8 +50,8 @@ export async function GET() {
         ...baseDays.map((d: DailyLog) => d.date)
       ])).sort();
       // Find week start and end
-      const weekStartDate = startOfWeek(parseISO(allDates[0]), { weekStartsOn: 1 });
-      const weekEndDate = endOfWeek(parseISO(allDates[0]), { weekStartsOn: 1 });
+      const weekStartDate = startOfWeek(parseISO(allDates[0] + 'T00:00:00.000Z'), { weekStartsOn: 1 });
+      const weekEndDate = endOfWeek(parseISO(allDates[0] + 'T00:00:00.000Z'), { weekStartsOn: 1 });
       // Build days array for compare and base
       const compareDaysMap = new Map<string, DailyLog>(compareDays.map((d: DailyLog) => [d.date, d]));
       const baseDaysMap = new Map<string, DailyLog>(baseDays.map((d: DailyLog) => [d.date, d]));
@@ -119,7 +119,8 @@ export async function POST(request: Request) {
     const parsedData = parseTradingLog(logData);
     // Always extract the date from the log text (first YYYY-MM-DD found)
     const match = logData.match(/(\d{4}-\d{2}-\d{2})/);
-    const date = match ? match[1] : new Date().toISOString().split('T')[0];
+    // Use UTC date to avoid timezone conversions
+    const date = match ? match[1] : new Date().toISOString().slice(0, 10);
 
     try {
       await tradingDataStore.addCompareLog({
