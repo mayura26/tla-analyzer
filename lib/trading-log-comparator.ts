@@ -38,6 +38,30 @@ interface ComparisonResult {
   };
 }
 
+function getTradeChanges(baseTrade: TradeListEntry, compareTrade: TradeListEntry): { field: keyof TradeListEntry; oldValue: any; newValue: any; }[] {
+  const changes = [];
+  for (const k of Object.keys(compareTrade) as Array<keyof TradeListEntry>) {
+    if (k === 'subTrades') {
+      const baseSubTrades = baseTrade.subTrades || [];
+      const compareSubTrades = compareTrade.subTrades || [];
+      if (JSON.stringify(baseSubTrades) !== JSON.stringify(compareSubTrades)) {
+        changes.push({
+          field: k,
+          oldValue: baseSubTrades,
+          newValue: compareSubTrades,
+        });
+      }
+    } else if (JSON.stringify(compareTrade[k]) !== JSON.stringify(baseTrade[k])) {
+      changes.push({
+        field: k,
+        oldValue: baseTrade[k],
+        newValue: compareTrade[k],
+      });
+    }
+  }
+  return changes;
+}
+
 export function compareTradingLogs(
   baseData: { trades: TradeListEntry[]; dailyStats: DailyStats },
   compareData: { trades: TradeListEntry[]; dailyStats: DailyStats }
@@ -57,12 +81,12 @@ export function compareTradingLogs(
   };
 
   // Composite key generator for trade matching
-  const tradeKey = (trade: TradeListEntry) =>
+  const strictTradeKey = (trade: TradeListEntry) =>
     `${new Date(trade.timestamp).toISOString()}|${trade.direction}|${Number(trade.entryPrice).toFixed(2)}|${trade.quantity}`;
 
   // Build maps by composite key
-  const baseTradeMap = new Map(baseData.trades.map(trade => [tradeKey(trade), trade]));
-  const compareTradeMap = new Map(compareData.trades.map(trade => [tradeKey(trade), trade]));
+  const baseTradeMap = new Map(baseData.trades.map(trade => [strictTradeKey(trade), trade]));
+  const compareTradeMap = new Map(compareData.trades.map(trade => [strictTradeKey(trade), trade]));
 
   // Track which trades have been matched
   const matchedBaseKeys = new Set<string>();
@@ -74,26 +98,8 @@ export function compareTradingLogs(
     if (baseTrade) {
       matchedBaseKeys.add(key);
       matchedCompareKeys.add(key);
-      const changes = [];
-      for (const k of Object.keys(compareTrade) as Array<keyof TradeListEntry>) {
-        if (k === 'subTrades') {
-          const baseSubTrades = baseTrade.subTrades || [];
-          const compareSubTrades = compareTrade.subTrades || [];
-          if (JSON.stringify(baseSubTrades) !== JSON.stringify(compareSubTrades)) {
-            changes.push({
-              field: k,
-              oldValue: baseSubTrades,
-              newValue: compareSubTrades,
-            });
-          }
-        } else if (JSON.stringify(compareTrade[k]) !== JSON.stringify(baseTrade[k])) {
-          changes.push({
-            field: k,
-            oldValue: baseTrade[k],
-            newValue: compareTrade[k],
-          });
-        }
-      }
+      const changes = getTradeChanges(baseTrade, compareTrade);
+
       if (changes.length > 0) {
         // If the only change is 'id', put in idOnlyChanged
         if (changes.length === 1 && changes[0].field === 'id') {
@@ -111,69 +117,62 @@ export function compareTradingLogs(
     }
   }
 
-  // Second pass: match by fill (sub-trade) timestamp for unmatched trades
-  // Build maps of fill timestamps to trades
-  const baseFillMap = new Map<string, TradeListEntry>();
-  const compareFillMap = new Map<string, TradeListEntry>();
-  for (const trade of baseData.trades) {
-    if (!matchedBaseKeys.has(tradeKey(trade))) {
-      for (const st of trade.subTrades || []) {
-        baseFillMap.set(new Date(st.exitPrice ? st.exitPrice : trade.timestamp).toISOString(), trade);
-      }
-    }
-  }
-  for (const trade of compareData.trades) {
-    if (!matchedCompareKeys.has(tradeKey(trade))) {
-      for (const st of trade.subTrades || []) {
-        compareFillMap.set(new Date(st.exitPrice ? st.exitPrice : trade.timestamp).toISOString(), trade);
-      }
-    }
-  }
+  // Second pass: fuzzy match by time (rounded to minute) and direction for unmatched trades
+  const fuzzyTradeKey = (trade: TradeListEntry) => {
+    const d = new Date(trade.timestamp);
+    d.setSeconds(0, 0); // Round down to the minute
+    return `${d.toISOString()}|${trade.direction}`;
+  };
 
-  // Try to match unmatched base and compare trades by any shared fill timestamp
-  const usedCompareTrades = new Set<TradeListEntry>();
-  for (const [fillTs, baseTrade] of baseFillMap) {
-    if (compareFillMap.has(fillTs)) {
-      const compareTrade = compareFillMap.get(fillTs)!;
-      if (!usedCompareTrades.has(compareTrade)) {
-        usedCompareTrades.add(compareTrade);
-        // Compare for modifications
-        const changes = [];
-        for (const k of Object.keys(compareTrade) as Array<keyof TradeListEntry>) {
-          if (k === 'subTrades') {
-            const baseSubTrades = baseTrade.subTrades || [];
-            const compareSubTrades = compareTrade.subTrades || [];
-            if (JSON.stringify(baseSubTrades) !== JSON.stringify(compareSubTrades)) {
-              changes.push({
-                field: k,
-                oldValue: baseSubTrades,
-                newValue: compareSubTrades,
-              });
-            }
-          } else if (JSON.stringify(compareTrade[k]) !== JSON.stringify(baseTrade[k])) {
-            changes.push({
-              field: k,
-              oldValue: baseTrade[k],
-              newValue: compareTrade[k],
-            });
-          }
-        }
+  // Group unmatched trades by fuzzy key
+  const unmatchedBaseMapFuzzy = new Map<string, TradeListEntry[]>();
+  baseData.trades.forEach(trade => {
+    if (!matchedBaseKeys.has(strictTradeKey(trade))) {
+      const key = fuzzyTradeKey(trade);
+      if (!unmatchedBaseMapFuzzy.has(key)) {
+        unmatchedBaseMapFuzzy.set(key, []);
+      }
+      unmatchedBaseMapFuzzy.get(key)!.push(trade);
+    }
+  });
+
+  const unmatchedCompareMapFuzzy = new Map<string, TradeListEntry[]>();
+  compareData.trades.forEach(trade => {
+    if (!matchedCompareKeys.has(strictTradeKey(trade))) {
+      const key = fuzzyTradeKey(trade);
+      if (!unmatchedCompareMapFuzzy.has(key)) {
+        unmatchedCompareMapFuzzy.set(key, []);
+      }
+      unmatchedCompareMapFuzzy.get(key)!.push(trade);
+    }
+  });
+
+  // Try to match based on fuzzy key
+  for (const [key, compareTrades] of unmatchedCompareMapFuzzy) {
+    const baseTrades = unmatchedBaseMapFuzzy.get(key);
+    if (baseTrades && baseTrades.length > 0 && compareTrades.length > 0) {
+      const numMatches = Math.min(baseTrades.length, compareTrades.length);
+
+      for (let i = 0; i < numMatches; i++) {
+        const baseTrade = baseTrades[i];
+        const compareTrade = compareTrades[i];
+
+        const baseKey = strictTradeKey(baseTrade);
+        const compareKey = strictTradeKey(compareTrade);
+
+        // Mark as matched using their strict keys
+        matchedBaseKeys.add(baseKey);
+        matchedCompareKeys.add(compareKey);
+
+        const changes = getTradeChanges(baseTrade, compareTrade);
+
         if (changes.length > 0) {
-          // If the only change is 'id', put in idOnlyChanged
           if (changes.length === 1 && changes[0].field === 'id') {
-            result.differences.trades.idOnlyChanged.push({
-              trade: compareTrade,
-              changes,
-            });
+            result.differences.trades.idOnlyChanged.push({ trade: compareTrade, changes });
           } else {
-            result.differences.trades.modified.push({
-              trade: compareTrade,
-              changes,
-            });
+            result.differences.trades.modified.push({ trade: compareTrade, changes });
           }
         }
-        matchedBaseKeys.add(tradeKey(baseTrade));
-        matchedCompareKeys.add(tradeKey(compareTrade));
       }
     }
   }

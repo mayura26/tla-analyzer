@@ -520,7 +520,9 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
           <div>
             <div className="text-sm font-medium mb-2">Modified Trades</div>
             <div className="space-y-2">
-              {comparison.differences.trades.modified.map(({ trade, changes }) => renderTrade(trade, true, changes))}
+              {comparison.differences.trades.modified
+                .sort((a, b) => new Date(a.trade.timestamp).getTime() - new Date(b.trade.timestamp).getTime())
+                .map(({ trade, changes }) => renderTrade(trade, true, changes))}
             </div>
           </div>
         )}
