@@ -33,6 +33,33 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
   const [isSaving, setIsSaving] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
   const [hasUnsavedNotes, setHasUnsavedNotes] = useState(false);
+  const [markedTrades, setMarkedTrades] = useState<Set<string>>(new Set());
+
+  // Helper function to generate a unique key for a trade
+  const getTradeKey = (trade: TradeListEntry) => {
+    return `${trade.timestamp}-${trade.entryPrice}-${trade.direction}-${trade.totalPnl}`;
+  };
+
+  // Toggle trade marking
+  const toggleTradeMarking = (trade: TradeListEntry) => {
+    const tradeKey = getTradeKey(trade);
+    setMarkedTrades(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(tradeKey)) {
+        newSet.delete(tradeKey);
+      } else {
+        newSet.add(tradeKey);
+      }
+      return newSet;
+    });
+  };
+
+  // Clear all markings when dialog opens
+  useEffect(() => {
+    if (isOpen) {
+      setMarkedTrades(new Set());
+    }
+  }, [isOpen]);
 
   // Helper function to ensure date is in YYYY-MM-DD format
   const getFormattedDate = (dateInput: string | Date): string => {
@@ -316,8 +343,21 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
     // Find PnL change if it exists
     const pnlChange = changes.find(change => change.field === 'totalPnl');
 
+    // Check if this trade is marked
+    const isMarked = markedTrades.has(getTradeKey(trade));
+
     return (
-      <div className={`p-3 rounded-lg ${isModified ? 'bg-muted/50' : 'bg-muted/30'}`}>
+      <div 
+        className={`p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-muted/60 ${
+          isMarked 
+            ? 'bg-muted/20 opacity-50 border border-muted-foreground/30' 
+            : isModified 
+              ? 'bg-muted/50' 
+              : 'bg-muted/30'
+        }`}
+        onClick={() => toggleTradeMarking(trade)}
+        title={isMarked ? "Click to unmark as reviewed" : "Click to mark as reviewed"}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Badge 
@@ -333,6 +373,9 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
               <Badge variant="outline" className="bg-yellow-400/20 text-yellow-400">
                 Chase
               </Badge>
+            )}
+            {isMarked && (
+              <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -521,8 +564,37 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
       { trades: compareTrades, dailyStats: compareStats }
     );
 
+    // Count total trades for marking progress
+    const totalTrades = comparison.differences.trades.added.length + 
+                       comparison.differences.trades.removed.length + 
+                       comparison.differences.trades.modified.length + 
+                       comparison.differences.trades.idOnlyChanged.length;
+
+    const clearAllMarkings = () => {
+      setMarkedTrades(new Set());
+    };
+
     return (
       <div className="space-y-4">
+        {/* Header with marking progress */}
+        {totalTrades > 0 && (
+          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+            <div className="text-sm text-muted-foreground">
+              {markedTrades.size} of {totalTrades} trades marked as reviewed
+            </div>
+            {markedTrades.size > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearAllMarkings}
+                className="text-xs"
+              >
+                Clear All
+              </Button>
+            )}
+          </div>
+        )}
+
         {comparison.differences.trades.added.length > 0 && (
           <div>
             <div className="text-sm font-medium mb-2">Added Trades</div>
