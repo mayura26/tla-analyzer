@@ -90,6 +90,49 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
     }
   }, [isOpen]);
 
+  // Automatically mark ID-only changed trades as processed
+  useEffect(() => {
+    if (isOpen && baseStats.tradeList && compareStats.tradeList) {
+      const baseTrades = baseStats.tradeList;
+      const compareTrades = compareStats.tradeList;
+      
+      // Compare trades using the existing comparison function
+      const comparison = compareTradingLogs(
+        { trades: baseTrades, dailyStats: baseStats },
+        { trades: compareTrades, dailyStats: compareStats }
+      );
+
+      if (comparison.differences.trades.idOnlyChanged.length > 0) {
+        const idOnlyTradeKeys = comparison.differences.trades.idOnlyChanged.map(({ trade }) => getTradeKey(trade));
+        
+        // Only update if there are new ID-only trades to mark
+        setMarkedTrades(prev => {
+          const newSet = new Set(prev);
+          let hasChanges = false;
+          idOnlyTradeKeys.forEach(key => {
+            if (!newSet.has(key)) {
+              newSet.add(key);
+              hasChanges = true;
+            }
+          });
+          return hasChanges ? newSet : prev;
+        });
+        
+        setCollapsedTrades(prev => {
+          const newSet = new Set(prev);
+          let hasChanges = false;
+          idOnlyTradeKeys.forEach(key => {
+            if (!newSet.has(key)) {
+              newSet.add(key);
+              hasChanges = true;
+            }
+          });
+          return hasChanges ? newSet : prev;
+        });
+      }
+    }
+  }, [isOpen, baseStats.tradeList, compareStats.tradeList, baseStats, compareStats]);
+
   // Helper function to ensure date is in YYYY-MM-DD format
   const getFormattedDate = (dateInput: string | Date): string => {
     if (typeof dateInput === 'string') {
@@ -654,38 +697,6 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
       { trades: baseTrades, dailyStats: baseStats },
       { trades: compareTrades, dailyStats: compareStats }
     );
-
-    // Automatically mark ID-only changed trades as processed
-    useEffect(() => {
-      if (isOpen && comparison.differences.trades.idOnlyChanged.length > 0) {
-        const idOnlyTradeKeys = comparison.differences.trades.idOnlyChanged.map(({ trade }) => getTradeKey(trade));
-        
-        // Only update if there are new ID-only trades to mark
-        setMarkedTrades(prev => {
-          const newSet = new Set(prev);
-          let hasChanges = false;
-          idOnlyTradeKeys.forEach(key => {
-            if (!newSet.has(key)) {
-              newSet.add(key);
-              hasChanges = true;
-            }
-          });
-          return hasChanges ? newSet : prev;
-        });
-        
-        setCollapsedTrades(prev => {
-          const newSet = new Set(prev);
-          let hasChanges = false;
-          idOnlyTradeKeys.forEach(key => {
-            if (!newSet.has(key)) {
-              newSet.add(key);
-              hasChanges = true;
-            }
-          });
-          return hasChanges ? newSet : prev;
-        });
-      }
-    }, [isOpen, baseTrades, compareTrades]); // Depend on the actual trade data, not the comparison result
 
     // Compute the set of trade keys that actually require review (added, removed, modified)
     const reviewTradeKeys = [
