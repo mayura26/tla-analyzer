@@ -254,6 +254,7 @@ export function CompareWeeklyAccordion({ weeks, onWeekMerged }: CompareWeeklyAcc
                           baseStats={baseStats}
                           compareStats={compareStats}
                           metadata={day.metadata}
+                          onMerge={() => onWeekMerged?.(week.weekStart)}
                         />
                       );
                     })}
@@ -276,6 +277,7 @@ export function CompareWeeklyAccordion({ weeks, onWeekMerged }: CompareWeeklyAcc
                             baseStats={baseStats}
                             compareStats={compareStats}
                             metadata={day.metadata}
+                            onMerge={() => onWeekMerged?.(week.weekStart)}
                           />
                         );
                       })}

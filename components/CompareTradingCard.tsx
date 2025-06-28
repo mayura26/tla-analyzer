@@ -16,9 +16,10 @@ interface CompareTradingCardProps {
     verifiedAt?: string;
     verifiedBy?: string;
   } | null;
+  onMerge?: () => void;
 }
 
-export function CompareTradingCard({ baseStats, compareStats, metadata }: CompareTradingCardProps) {
+export function CompareTradingCard({ baseStats, compareStats, metadata, onMerge }: CompareTradingCardProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isVerified, setIsVerified] = useState(metadata?.verified || false);
   const [notes, setNotes] = useState<string>(metadata?.notes || "");
@@ -230,6 +231,7 @@ export function CompareTradingCard({ baseStats, compareStats, metadata }: Compar
         onClose={() => setIsDialogOpen(false)}
         baseStats={baseStats}
         compareStats={compareStats}
+        onMerge={onMerge}
         onVerificationChange={(verified) => setIsVerified(verified)}
         onNotesChange={handleNotesChange}
       />
