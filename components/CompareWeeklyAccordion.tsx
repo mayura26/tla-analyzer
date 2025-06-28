@@ -124,6 +124,16 @@ export function CompareWeeklyAccordion({ weeks, onWeekMerged }: CompareWeeklyAcc
     }
   };
 
+  // If no weeks are provided, show a message
+  if (weeks.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <p>No weeks with unverified days found.</p>
+        <p className="text-sm mt-2">All days in the available weeks have been verified.</p>
+      </div>
+    );
+  }
+
   return (
     <Accordion type="single" collapsible value={openWeek} onValueChange={setOpenWeek} className="w-full">
       {weeks.map((week: any) => {

@@ -21,8 +21,12 @@ function getWeekKey(dateStr: string) {
   return `${year}-${month}-${dayOfMonth}`;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    // Parse query parameters
+    const { searchParams } = new URL(request.url);
+    const unverifiedOnly = searchParams.get('unverifiedOnly') === 'true';
+
     // Get data from the trading data store
     const [compareData, baseData] = await Promise.all([
       tradingDataStore.getCompareData(),
@@ -69,7 +73,7 @@ export async function GET() {
       const compareDaysMap = new Map<string, DailyLog>(compareDays.map((d: DailyLog) => [d.date, d]));
       const baseDaysMap = new Map<string, DailyLog>(baseDays.map((d: DailyLog) => [d.date, d]));
       // For each date, build a day entry for compare and base
-      const days = allDates.map(date => {
+      let days = allDates.map(date => {
         const compareDay = compareDaysMap.get(date);
         const baseDay = baseDaysMap.get(date);
         return {
@@ -80,6 +84,15 @@ export async function GET() {
           metadata: compareDay ? compareDay.metadata : null
         };
       });
+
+      // Filter days if unverifiedOnly is true
+      if (unverifiedOnly) {
+        days = days.filter(day => {
+          // Only include days that have compare data AND are unverified
+          return day.compareAnalysis && (!day.metadata || !day.metadata.verified);
+        });
+      }
+
       // Calculate weekHeadline for compare and base
       function calcHeadline(daysArr: any[], key: 'compareAnalysis' | 'baseAnalysis') {
         return daysArr.reduce((acc, d) => {
@@ -114,7 +127,10 @@ export async function GET() {
       };
     });
 
-    return NextResponse.json(weekLogs);
+    // Filter out weeks with no days after filtering
+    const filteredWeekLogs = weekLogs.filter(week => week.days.length > 0);
+
+    return NextResponse.json(filteredWeekLogs);
   } catch (error) {
     console.error("Error in compare API:", error);
     return NextResponse.json(
