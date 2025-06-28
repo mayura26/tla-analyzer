@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DailyStats, TradeListEntry } from "@/lib/trading-log-parser";
 import { format, parseISO } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
-import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { compareTradingLogs } from "@/lib/trading-log-comparator";
@@ -34,6 +34,7 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
   const [isMerging, setIsMerging] = useState(false);
   const [hasUnsavedNotes, setHasUnsavedNotes] = useState(false);
   const [markedTrades, setMarkedTrades] = useState<Set<string>>(new Set());
+  const [collapsedTrades, setCollapsedTrades] = useState<Set<string>>(new Set());
 
   // Helper function to generate a unique key for a trade
   const getTradeKey = (trade: TradeListEntry) => {
@@ -44,6 +45,33 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
   const toggleTradeMarking = (trade: TradeListEntry) => {
     const tradeKey = getTradeKey(trade);
     setMarkedTrades(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(tradeKey)) {
+        newSet.delete(tradeKey);
+        // When unmarking, also expand the trade
+        setCollapsedTrades(prevCollapsed => {
+          const newCollapsed = new Set(prevCollapsed);
+          newCollapsed.delete(tradeKey);
+          return newCollapsed;
+        });
+      } else {
+        newSet.add(tradeKey);
+        // When marking, also collapse the trade
+        setCollapsedTrades(prevCollapsed => {
+          const newCollapsed = new Set(prevCollapsed);
+          newCollapsed.add(tradeKey);
+          return newCollapsed;
+        });
+      }
+      return newSet;
+    });
+  };
+
+  // Toggle trade collapse state
+  const toggleTradeCollapse = (trade: TradeListEntry, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent triggering the parent click
+    const tradeKey = getTradeKey(trade);
+    setCollapsedTrades(prev => {
       const newSet = new Set(prev);
       if (newSet.has(tradeKey)) {
         newSet.delete(tradeKey);
@@ -58,6 +86,7 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
   useEffect(() => {
     if (isOpen) {
       setMarkedTrades(new Set());
+      setCollapsedTrades(new Set());
     }
   }, [isOpen]);
 
@@ -343,8 +372,61 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
     // Find PnL change if it exists
     const pnlChange = changes.find(change => change.field === 'totalPnl');
 
-    // Check if this trade is marked
-    const isMarked = markedTrades.has(getTradeKey(trade));
+    // Check if this trade is marked and collapsed
+    const tradeKey = getTradeKey(trade);
+    const isMarked = markedTrades.has(tradeKey);
+    const isCollapsed = collapsedTrades.has(tradeKey);
+
+    // If marked and collapsed, show minimized version
+    if (isMarked && isCollapsed) {
+      return (
+        <div 
+          className="p-2 rounded-lg cursor-pointer transition-all duration-200 hover:bg-muted/60 bg-muted/20 opacity-50 border border-muted-foreground/30"
+          onClick={() => toggleTradeMarking(trade)}
+          title="Click to unmark as reviewed"
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div 
+                className="cursor-pointer p-1 hover:bg-muted/40 rounded"
+                onClick={(e) => toggleTradeCollapse(trade, e)}
+                title="Expand trade details"
+              >
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <Badge 
+                variant="outline" 
+                className={`${
+                  trade.direction === 'LONG' ? 'bg-green-400/20 text-green-400' : 'bg-red-400/20 text-red-400'
+                }`}
+              >
+                {trade.direction}
+              </Badge>
+              <span className="text-sm">{formatTime(trade.timestamp)}</span>
+              {trade.isChaseTrade && (
+                <Badge variant="outline" className="bg-yellow-400/20 text-yellow-400">
+                  Chase
+                </Badge>
+              )}
+              <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge 
+                variant="outline" 
+                className={`${
+                  trade.totalPnl >= 0 
+                    ? 'bg-green-400/20 text-green-400 border-green-400/30' 
+                    : 'bg-red-400/20 text-red-400 border-red-400/30'
+                }`}
+              >
+                {formatCurrency(trade.totalPnl)}
+              </Badge>
+              <Badge variant="outline" className="text-xs">{trade.entryPrice}</Badge>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div 
@@ -360,6 +442,15 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
+            {isMarked && (
+              <div 
+                className="cursor-pointer p-1 hover:bg-muted/40 rounded"
+                onClick={(e) => toggleTradeCollapse(trade, e)}
+                title="Collapse trade details"
+              >
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              </div>
+            )}
             <Badge 
               variant="outline" 
               className={`${
@@ -564,14 +655,50 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
       { trades: compareTrades, dailyStats: compareStats }
     );
 
-    // Count total trades for marking progress
-    const totalTrades = comparison.differences.trades.added.length + 
-                       comparison.differences.trades.removed.length + 
-                       comparison.differences.trades.modified.length + 
-                       comparison.differences.trades.idOnlyChanged.length;
+    // Automatically mark ID-only changed trades as processed
+    useEffect(() => {
+      if (isOpen && comparison.differences.trades.idOnlyChanged.length > 0) {
+        const idOnlyTradeKeys = comparison.differences.trades.idOnlyChanged.map(({ trade }) => getTradeKey(trade));
+        
+        // Only update if there are new ID-only trades to mark
+        setMarkedTrades(prev => {
+          const newSet = new Set(prev);
+          let hasChanges = false;
+          idOnlyTradeKeys.forEach(key => {
+            if (!newSet.has(key)) {
+              newSet.add(key);
+              hasChanges = true;
+            }
+          });
+          return hasChanges ? newSet : prev;
+        });
+        
+        setCollapsedTrades(prev => {
+          const newSet = new Set(prev);
+          let hasChanges = false;
+          idOnlyTradeKeys.forEach(key => {
+            if (!newSet.has(key)) {
+              newSet.add(key);
+              hasChanges = true;
+            }
+          });
+          return hasChanges ? newSet : prev;
+        });
+      }
+    }, [isOpen, baseTrades, compareTrades]); // Depend on the actual trade data, not the comparison result
+
+    // Compute the set of trade keys that actually require review (added, removed, modified)
+    const reviewTradeKeys = [
+      ...comparison.differences.trades.added.map(getTradeKey),
+      ...comparison.differences.trades.removed.map(getTradeKey),
+      ...comparison.differences.trades.modified.map(({ trade }) => getTradeKey(trade)),
+    ];
+    const reviewedCount = reviewTradeKeys.filter(key => markedTrades.has(key)).length;
+    const totalTrades = reviewTradeKeys.length;
 
     const clearAllMarkings = () => {
       setMarkedTrades(new Set());
+      setCollapsedTrades(new Set());
     };
 
     return (
@@ -580,7 +707,12 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
         {totalTrades > 0 && (
           <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
             <div className="text-sm text-muted-foreground">
-              {markedTrades.size} of {totalTrades} trades marked as reviewed
+              {reviewedCount} of {totalTrades} trades marked as reviewed
+              {comparison.differences.trades.idOnlyChanged.length > 0 && (
+                <span className="ml-2 text-xs">
+                  ({comparison.differences.trades.idOnlyChanged.length} ID-only changes auto-marked)
+                </span>
+              )}
             </div>
             {markedTrades.size > 0 && (
               <Button
@@ -635,7 +767,9 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
 
         {comparison.differences.trades.idOnlyChanged.length > 0 && (
           <div>
-            <div className="text-sm font-medium mb-2 text-muted-foreground">Trades with Only ID Changes</div>
+            <div className="text-sm font-medium mb-2 text-muted-foreground">
+              Trades with Only ID Changes (Auto-marked as Reviewed)
+            </div>
             <div className="space-y-2 opacity-60">
               {comparison.differences.trades.idOnlyChanged.map(({ trade, changes }) => renderTrade(trade, true, changes))}
             </div>
