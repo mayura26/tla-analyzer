@@ -131,7 +131,13 @@ export function WeeklyLogAccordion({ weeks, notesData, onNotesChange }: WeeklyLo
                     return dateA.getTime() - dateB.getTime();
                   })
                   .map((day) => (
-                  <TradingCard key={day.date} stats={transformToDailyStats(day)} notes={notesData[day.date] || ""} onNotesChange={onNotesChange} />
+                  <TradingCard 
+                    key={day.date} 
+                    stats={transformToDailyStats(day)} 
+                    notes={notesData[day.date] || ""} 
+                    onNotesChange={onNotesChange}
+                    metadata={day.metadata}
+                  />
                 ))}
               </div>
             </AccordionContent>

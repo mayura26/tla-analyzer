@@ -156,10 +156,16 @@ export async function POST(request: Request) {
     // Use UTC date to avoid timezone conversions
     const date = match ? match[1] : new Date().toISOString().slice(0, 10);
 
+    // Add timestamp for when this data was added
+    const addedAt = new Date().toISOString();
+
     try {
       await tradingDataStore.addCompareLog({
         date,
-        analysis: parsedData
+        analysis: parsedData,
+        metadata: {
+          addedAt
+        }
       });
       return NextResponse.json({ success: true });
     } catch (error) {

@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DailyStats } from "@/lib/trading-log-parser";
-import { format } from "date-fns";
-import { TrendingUp, TrendingDown, Target, DollarSign, Trophy, CheckCircle2, FileText } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { TrendingUp, TrendingDown, Target, DollarSign, Trophy, CheckCircle2, FileText, Clock } from "lucide-react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { useState } from "react";
 import { CompareTradingDialog } from "./CompareTradingDialog";
@@ -15,6 +15,7 @@ interface CompareTradingCardProps {
     notes?: string;
     verifiedAt?: string;
     verifiedBy?: string;
+    addedAt?: string;
   } | null;
   onMerge?: () => void;
 }
@@ -224,6 +225,19 @@ export function CompareTradingCard({ baseStats, compareStats, metadata, onMerge 
             <></>
           )}
         </CardContent>
+
+        {/* Data Added Timestamp - always visible at bottom */}
+        <div className="px-6 pb-4">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground pt-2 border-t">
+            <Clock className="w-3 h-3" />
+            <span>
+              Added: {metadata?.addedAt 
+                ? format(parseISO(metadata.addedAt), 'MMM dd, yyyy HH:mm')
+                : 'Unknown'
+              }
+            </span>
+          </div>
+        </div>
       </Card>
 
       <CompareTradingDialog

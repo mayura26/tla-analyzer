@@ -77,6 +77,7 @@ export interface DailyLog {
     notes?: string;
     verifiedAt?: string;
     verifiedBy?: string;
+    addedAt?: string;
   };
 }
 
@@ -366,7 +367,10 @@ class TradingDataStore {
     if (mergeOptions.mergeAll) {
       await this.addLog('compare', {
         date: baseData.date,
-        analysis: baseData.analysis
+        analysis: baseData.analysis,
+        metadata: {
+          addedAt: new Date().toISOString()
+        }
       });
     } else {
       if (mergeOptions.mergeTradeIds) {
@@ -392,7 +396,10 @@ class TradingDataStore {
 
       await this.addLog('compare', {
         date: mergedData.date,
-        analysis: mergedData.analysis
+        analysis: mergedData.analysis,
+        metadata: {
+          addedAt: new Date().toISOString()
+        }
       });
     }
 
@@ -457,10 +464,15 @@ class TradingDataStore {
     }
 
     // Add the compare data to the base data (this will overwrite if it exists)
+    // Update the addedAt timestamp to reflect when this merge occurred
+    const mergeTimestamp = new Date().toISOString();
     await this.addLog('daily', {
       date: compareDay.date,
       analysis: compareDay.analysis,
-      metadata: compareDay.metadata
+      metadata: {
+        ...compareDay.metadata,
+        addedAt: mergeTimestamp
+      }
     });
 
     // Remove the compare data for this date after successful merge
@@ -511,10 +523,15 @@ class TradingDataStore {
 
     // Merge each day's compare data to base data
     for (const compareDay of weekCompareData) {
+      // Update the addedAt timestamp to reflect when this merge occurred
+      const mergeTimestamp = new Date().toISOString();
       await this.addLog('daily', {
         date: compareDay.date,
         analysis: compareDay.analysis,
-        metadata: compareDay.metadata
+        metadata: {
+          ...compareDay.metadata,
+          addedAt: mergeTimestamp
+        }
       });
     }
 
