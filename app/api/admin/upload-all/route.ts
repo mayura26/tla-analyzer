@@ -35,6 +35,25 @@ const EXPECTED_FILES = {
       return null;
     }
   },
+  'replaced-compare-data.json': {
+    description: 'Replaced comparison dataset',
+    validateContent: (parsedJson: any) => {
+      if (!Array.isArray(parsedJson)) {
+        return 'replaced-compare-data.json must contain an array of replaced comparison data';
+      }
+      // Basic validation for replaced comparison data structure
+      for (const item of parsedJson) {
+        if (!item.date || !item.analysis) {
+          return 'Each item in replaced-compare-data.json must have date and analysis properties';
+        }
+        // Optional metadata validation
+        if (item.metadata && typeof item.metadata !== 'object') {
+          return 'Each item in replaced-compare-data.json must have metadata as an object if present';
+        }
+      }
+      return null;
+    }
+  },
   'notes.json': {
     description: 'Trading notes data',
     validateContent: (parsedJson: any) => {

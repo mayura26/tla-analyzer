@@ -4,7 +4,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Download, Upload, FileText, Database, Loader2, Trash2 } from "lucide-react";
+import { Download, Upload, FileText, Database, Loader2, Trash2, History, Eye } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ReplacedCompareDialog } from "@/components/ReplacedCompareDialog";
+import { TradeListEntry } from "@/lib/trading-log-parser";
 
 interface FileInfo {
   name: string;
@@ -12,6 +15,25 @@ interface FileInfo {
   size: string;
   exists: boolean;
   lastModified: string | null;
+}
+
+interface ReplacedCompareData {
+  date: string;
+  analysis: {
+    headline: {
+      totalPnl: number;
+      totalTrades: number;
+      wins: number;
+      losses: number;
+    };
+    tradeList: TradeListEntry[];
+  };
+  metadata?: {
+    replacedAt?: string;
+    replacedReason?: string;
+    originalDate?: string;
+    addedAt?: string;
+  };
 }
 
 export default function AdminPage() {
@@ -24,9 +46,14 @@ export default function AdminPage() {
   const [clearStatus, setClearStatus] = useState<string>("");
   const [downloadingAll, setDownloadingAll] = useState(false);
   const [uploadingAll, setUploadingAll] = useState(false);
+  const [replacedCompareData, setReplacedCompareData] = useState<ReplacedCompareData[]>([]);
+  const [loadingReplacedData, setLoadingReplacedData] = useState(false);
+  const [selectedReplacedData, setSelectedReplacedData] = useState<ReplacedCompareData | null>(null);
+  const [isReplacedDialogOpen, setIsReplacedDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchFileInfo();
+    fetchReplacedCompareData();
   }, []);
 
   const fetchFileInfo = async () => {
@@ -44,6 +71,23 @@ export default function AdminPage() {
       setError('Failed to load file information');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchReplacedCompareData = async () => {
+    try {
+      setLoadingReplacedData(true);
+      const response = await fetch('/api/trading-data/compare/replaced');
+      if (response.ok) {
+        const data = await response.json();
+        setReplacedCompareData(data);
+      } else {
+        console.error('Failed to load replaced comparison data');
+      }
+    } catch (error) {
+      console.error('Error fetching replaced comparison data:', error);
+    } finally {
+      setLoadingReplacedData(false);
     }
   };
 
@@ -218,6 +262,16 @@ export default function AdminPage() {
   const dataFiles = files.filter(file => file.name !== 'notes.json');
   const noteFiles = files.filter(file => file.name === 'notes.json');
   const existingFiles = files.filter(file => file.exists);
+
+  const handleReplacedDataClick = (item: ReplacedCompareData) => {
+    setSelectedReplacedData(item);
+    setIsReplacedDialogOpen(true);
+  };
+
+  const handleReplacedDataDelete = () => {
+    // Refresh the replaced comparison data after deletion
+    fetchReplacedCompareData();
+  };
 
   if (loading) {
     return (
@@ -394,7 +448,7 @@ export default function AdminPage() {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Upload a ZIP file containing all data files (all-days.json, compare-data.json, notes.json)
+                  Upload a ZIP file containing all data files (all-days.json, compare-data.json, replaced-compare-data.json, notes.json)
                 </p>
               </div>
 
@@ -430,6 +484,22 @@ export default function AdminPage() {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Will be saved as: compare-data.json</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Upload Replaced Compare Data File (replaced-compare-data.json)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={(e) => handleUpload(e, "replaced-compare-data")}
+                    disabled={uploading || uploadingAll}
+                    className="flex-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Will be saved as: replaced-compare-data.json</p>
               </div>
 
               <div>
@@ -518,6 +588,17 @@ export default function AdminPage() {
                   <Button
                     variant="destructive"
                     size="sm"
+                    onClick={() => handleClear('replaced-compare-data')}
+                    disabled={clearing || !dataFiles.find(f => f.name === 'replaced-compare-data.json')?.exists}
+                    className="w-full justify-start"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear replaced-compare-data.json
+                  </Button>
+                  
+                  <Button
+                    variant="destructive"
+                    size="sm"
                     onClick={() => handleClear('notes')}
                     disabled={clearing || !noteFiles.find(f => f.name === 'notes.json')?.exists}
                     className="w-full justify-start"
@@ -578,7 +659,113 @@ export default function AdminPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Replaced Comparison Data Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Replaced Comparison Data
+            </CardTitle>
+            <CardDescription>
+              View comparison data that was replaced due to significant differences
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {loadingReplacedData ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Loading replaced comparison data...</span>
+                </div>
+              </div>
+            ) : replacedCompareData.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <History className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No replaced comparison data found</p>
+                <p className="text-sm">Replaced comparisons will appear here when significant differences are detected</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold">Replaced Comparisons ({replacedCompareData.length})</h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchReplacedCompareData}
+                    disabled={loadingReplacedData}
+                  >
+                    <Loader2 className={`h-4 w-4 mr-2 ${loadingReplacedData ? 'animate-spin' : 'hidden'}`} />
+                    Refresh
+                  </Button>
+                </div>
+                
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {replacedCompareData.map((item) => (
+                    <div
+                      key={`${item.date}-${item.metadata?.replacedAt}`}
+                      className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                      onClick={() => handleReplacedDataClick(item)}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-xs">
+                            {item.date}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
+                            Replaced
+                          </Badge>
+                        </div>
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">PnL:</span>
+                          <span className={`ml-1 font-medium ${
+                            item.analysis.headline.totalPnl >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            ${item.analysis.headline.totalPnl.toFixed(2)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Trades:</span>
+                          <span className="ml-1 font-medium">{item.analysis.headline.totalTrades}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Wins:</span>
+                          <span className="ml-1 font-medium text-green-600">{item.analysis.headline.wins}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Losses:</span>
+                          <span className="ml-1 font-medium text-red-600">{item.analysis.headline.losses}</span>
+                        </div>
+                      </div>
+                      
+                      {item.metadata?.replacedAt && (
+                        <div className="text-xs text-muted-foreground mt-2">
+                          Replaced: {new Date(item.metadata.replacedAt).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Replaced Comparison Dialog */}
+      <ReplacedCompareDialog
+        isOpen={isReplacedDialogOpen}
+        onClose={() => {
+          setIsReplacedDialogOpen(false);
+          setSelectedReplacedData(null);
+        }}
+        replacedData={selectedReplacedData}
+        onDelete={handleReplacedDataDelete}
+      />
     </div>
   );
 } 

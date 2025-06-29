@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     
     switch (fileType) {
       case 'all':
-        filesToClear = ['all-days.json', 'compare-data.json', 'notes.json'];
+        filesToClear = ['all-days.json', 'compare-data.json', 'replaced-compare-data.json', 'notes.json'];
         break;
       case 'all-days':
         filesToClear = ['all-days.json'];
@@ -26,12 +26,15 @@ export async function POST(request: NextRequest) {
       case 'compare-data':
         filesToClear = ['compare-data.json'];
         break;
+      case 'replaced-compare-data':
+        filesToClear = ['replaced-compare-data.json'];
+        break;
       case 'notes':
         filesToClear = ['notes.json'];
         break;
       default:
         return NextResponse.json({ 
-          error: 'Invalid file type. Expected: all, all-days, compare-data, or notes' 
+          error: 'Invalid file type. Expected: all, all-days, compare-data, replaced-compare-data, or notes' 
         }, { status: 400 });
     }
 

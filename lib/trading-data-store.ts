@@ -78,6 +78,9 @@ export interface DailyLog {
     verifiedAt?: string;
     verifiedBy?: string;
     addedAt?: string;
+    replacedAt?: string;
+    replacedReason?: string;
+    originalDate?: string;
   };
 }
 
@@ -99,7 +102,7 @@ export interface WeekLog {
   } | null;
 }
 
-type DataEndpoint = 'daily' | 'compare';
+type DataEndpoint = 'daily' | 'compare' | 'replaced-compare';
 
 class TradingDataStore {
   private static instance: TradingDataStore;
@@ -126,6 +129,11 @@ class TradingDataStore {
       compare: {
         path: typeof window === 'undefined' ? path.join(this.dataDir, 'compare-data.json') : '/data/compare-data.json',
         storageKey: 'trading_compare_days',
+        data: []
+      },
+      'replaced-compare': {
+        path: typeof window === 'undefined' ? path.join(this.dataDir, 'replaced-compare-data.json') : '/data/replaced-compare-data.json',
+        storageKey: 'trading_replaced_compare_days',
         data: []
       }
     };
@@ -559,6 +567,58 @@ class TradingDataStore {
 
     this.endpoints.compare.data = updatedCompareData;
     await this.saveToStorage('compare');
+    return true;
+  }
+
+  // Methods for handling replaced comparison data
+  async addReplacedCompareLog(day: DailyLog) {
+    return this.addLog('replaced-compare', day);
+  }
+
+  async getReplacedCompareData(): Promise<DailyLog[]> {
+    return this.getLogs('replaced-compare');
+  }
+
+  async getReplacedCompareByDate(date: string): Promise<DailyLog | null> {
+    await this.loadFromStorage('replaced-compare');
+    const replacedCompareData = this.endpoints['replaced-compare'].data;
+    return replacedCompareData.find(d => d.date === date) || null;
+  }
+
+  async saveReplacedComparison(date: string, replacedData: DailyLog): Promise<void> {
+    // Add metadata to indicate when and why this was replaced
+    const enhancedData: DailyLog = {
+      ...replacedData,
+      metadata: {
+        ...replacedData.metadata,
+        replacedAt: new Date().toISOString(),
+        replacedReason: 'New comparison submitted',
+        originalDate: date
+      }
+    };
+    
+    await this.addReplacedCompareLog(enhancedData);
+  }
+
+  async clearReplacedCompareData() {
+    return this.clearData('replaced-compare');
+  }
+
+  async deleteReplacedCompareByDate(date: string): Promise<boolean> {
+    await this.loadFromStorage('replaced-compare');
+    const replacedCompareData = this.endpoints['replaced-compare'].data;
+    const initialLength = replacedCompareData.length;
+    
+    // Remove the replaced compare data for the specified date
+    const updatedReplacedCompareData = replacedCompareData.filter(d => d.date !== date);
+    
+    if (updatedReplacedCompareData.length === initialLength) {
+      // No data was found for this date
+      return false;
+    }
+
+    this.endpoints['replaced-compare'].data = updatedReplacedCompareData;
+    await this.saveToStorage('replaced-compare');
     return true;
   }
 }

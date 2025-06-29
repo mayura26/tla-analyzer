@@ -176,15 +176,17 @@ export default function ComparePage() {
           submittedPnl,
           basePnl,
           pnlDifference,
-          previousComparePnl,
+          previousComparePnl: result.previousPnl || previousComparePnl,
           previousCompareDifference,
-          hadExistingCompare,
+          hadExistingCompare: result.hadExistingCompare || hadExistingCompare,
         };
         
         setSubmissionLog(prev => [newSubmission, ...prev]);
         setLogData('');
         
-        if (hadExistingCompare) {
+        if (result.replaced) {
+          toast.success("Comparison data updated successfully. Previous comparison was saved for review due to significant differences.");
+        } else if (result.hadExistingCompare) {
           toast.success("Comparison data updated successfully. Previous comparison was replaced.");
         } else {
           toast.success("Comparison data has been processed successfully.");

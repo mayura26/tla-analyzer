@@ -156,6 +156,25 @@ export async function POST(request: Request) {
     // Use UTC date to avoid timezone conversions
     const date = match ? match[1] : new Date().toISOString().slice(0, 10);
 
+    // Check if there's existing comparison data for this date
+    const existingCompareData = await tradingDataStore.getCompareByDate(date);
+    let hadExistingCompare = false;
+    let previousPnl: number | undefined;
+
+    if (existingCompareData) {
+      hadExistingCompare = true;
+      previousPnl = existingCompareData.analysis.headline.totalPnl;
+      
+      // Check if there's a difference between the new and existing data
+      const newPnl = parsedData.headline.totalPnl;
+      const pnlDifference = Math.abs(newPnl - previousPnl);
+      
+      // If there's a significant difference (more than $1), save the existing data as replaced
+      if (pnlDifference > 1) {
+        await tradingDataStore.saveReplacedComparison(date, existingCompareData);
+      }
+    }
+
     // Add timestamp for when this data was added
     const addedAt = new Date().toISOString();
 
@@ -167,7 +186,13 @@ export async function POST(request: Request) {
           addedAt
         }
       });
-      return NextResponse.json({ success: true });
+      
+      return NextResponse.json({ 
+        success: true, 
+        hadExistingCompare,
+        previousPnl,
+        replaced: hadExistingCompare && previousPnl !== undefined && Math.abs(parsedData.headline.totalPnl - previousPnl) > 1
+      });
     } catch (error) {
       console.error('Error saving compare data:', error);
       return NextResponse.json(
