@@ -77,19 +77,19 @@ export function CompareTradingCard({ baseStats, compareStats, metadata, onMerge 
 
   const hasChanges = pnlDiff.value !== 0 || tradesDiff !== 0 || winsDiff !== 0 || lossesDiff !== 0 || bigWinDiff !== 0 || bigLossDiff !== 0;
 
-  // Nuanced PnL diff color function
-  const getPnlDiffColor = (value: number) => {
+  // Enhanced badge color function for theme-aware styling
+  const getBadgeColors = (value: number) => {
     const abs = Math.abs(value);
     if (value >= 0) {
-      if (abs < 40) return 'text-gray-100';
-      if (abs < 150) return 'text-green-400';
-      if (abs < 300) return 'text-green-600 font-bold';
-      return 'text-green-800 font-extrabold';
+      if (abs < 40) return 'bg-muted text-muted-foreground border-border';
+      if (abs < 150) return 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/50 dark:text-green-400 dark:border-green-800';
+      if (abs < 300) return 'bg-green-100 text-green-800 border-green-300 dark:bg-green-950/70 dark:text-green-300 dark:border-green-700';
+      return 'bg-green-200 text-green-900 border-green-400 dark:bg-green-950/90 dark:text-green-200 dark:border-green-600';
     } else {
-      if (abs < 40) return 'text-gray-100';
-      if (abs < 150) return 'text-red-400';
-      if (abs < 300) return 'text-red-600 font-bold';
-      return 'text-red-800 font-extrabold';
+      if (abs < 40) return 'bg-muted text-muted-foreground border-border';
+      if (abs < 150) return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800';
+      if (abs < 300) return 'bg-red-100 text-red-800 border-red-300 dark:bg-red-950/70 dark:text-red-300 dark:border-red-700';
+      return 'bg-red-200 text-red-900 border-red-400 dark:bg-red-950/90 dark:text-red-200 dark:border-red-600';
     }
   };
 
@@ -137,9 +137,11 @@ export function CompareTradingCard({ baseStats, compareStats, metadata, onMerge 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <DollarSign className="w-4 h-4 text-muted-foreground" />
-                  <span className={`font-semibold ${getPnlDiffColor(pnlDiff.value)}`}>
+                  <Badge 
+                    className={`font-semibold text-sm px-3 py-1 ${getBadgeColors(pnlDiff.value)}`}
+                  >
                     {formatDifference(pnlDiff)}
-                  </span>
+                  </Badge>
                 </div>
                 {getPnlIcon(pnlDiff.value)}
               </div>
