@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import JSZip from 'jszip';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const dataDir = path.join(process.cwd(), 'data');
     
