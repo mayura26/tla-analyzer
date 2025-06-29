@@ -1,2 +1,1 @@
 [ ] If ther eis already a compare, lets check that data before overwriting and also lets keep that data somewhere
-[ ] Delete day rather than merge

@@ -17,6 +17,9 @@ interface SubmissionLog {
   submittedPnl?: number; // PnL from submitted data
   basePnl?: number; // PnL from base data
   pnlDifference?: number; // Difference between submitted and base PnL
+  previousComparePnl?: number; // PnL from previous comparison data
+  previousCompareDifference?: number; // Difference between submitted and previous compare PnL
+  hadExistingCompare?: boolean; // Whether there was existing compare data
 }
 
 export default function ComparePage() {
@@ -93,9 +96,40 @@ export default function ComparePage() {
     return undefined;
   };
 
+  // Function to fetch existing compare data for a specific date
+  const fetchExistingCompareData = async (date: string): Promise<number | undefined> => {
+    try {
+      const response = await fetch(`/api/trading-data/compare/manage?date=${date}`);
+      if (response.ok) {
+        const compareData = await response.json();
+        return compareData.analysis.headline.totalPnl;
+      }
+    } catch (error) {
+      console.error('Error fetching existing compare data:', error);
+    }
+    return undefined;
+  };
+
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
+      // Extract data from the submitted log first
+      const dataDate = extractDataDate(logData);
+      const submittedPnl = extractPnL(logData);
+      
+      // Check for existing compare data if we have a date
+      let previousComparePnl: number | undefined;
+      let hadExistingCompare = false;
+      if (dataDate) {
+        // Convert date format for API call (MM/DD/YYYY to YYYY-MM-DD)
+        const dateParts = dataDate.split('/');
+        if (dateParts.length === 3) {
+          const apiDate = `${dateParts[2]}-${dateParts[0].padStart(2, '0')}-${dateParts[1].padStart(2, '0')}`;
+          previousComparePnl = await fetchExistingCompareData(apiDate);
+          hadExistingCompare = previousComparePnl !== undefined;
+        }
+      }
+
       const response = await fetch('/api/trading-data/compare', {
         method: 'POST',
         headers: {
@@ -111,10 +145,6 @@ export default function ComparePage() {
 
       const result = await response.json();
       if (result.success) {
-        // Extract data from the submitted log
-        const dataDate = extractDataDate(logData);
-        const submittedPnl = extractPnL(logData);
-        
         // Fetch base data if we have a date
         let basePnl: number | undefined;
         if (dataDate) {
@@ -126,9 +156,13 @@ export default function ComparePage() {
           }
         }
 
-        // Calculate PnL difference
+        // Calculate PnL differences
         const pnlDifference = submittedPnl !== undefined && basePnl !== undefined 
           ? submittedPnl - basePnl 
+          : undefined;
+        
+        const previousCompareDifference = submittedPnl !== undefined && previousComparePnl !== undefined 
+          ? submittedPnl - previousComparePnl 
           : undefined;
 
         // Add to submission log
@@ -142,11 +176,19 @@ export default function ComparePage() {
           submittedPnl,
           basePnl,
           pnlDifference,
+          previousComparePnl,
+          previousCompareDifference,
+          hadExistingCompare,
         };
         
         setSubmissionLog(prev => [newSubmission, ...prev]);
         setLogData('');
-        toast.success("Comparison data has been processed successfully.");
+        
+        if (hadExistingCompare) {
+          toast.success("Comparison data updated successfully. Previous comparison was replaced.");
+        } else {
+          toast.success("Comparison data has been processed successfully.");
+        }
       }
     } catch (error) {
       console.error("Error processing comparison data:", error);
@@ -189,6 +231,11 @@ export default function ComparePage() {
                         <Badge variant="secondary" className="text-xs">
                           {log.dataDate || log.date}
                         </Badge>
+                        {log.hadExistingCompare && (
+                          <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
+                            Updated
+                          </Badge>
+                        )}
                         <span className="text-muted-foreground">{log.time}</span>
                         {log.submittedPnl !== undefined && (
                           <>
@@ -211,6 +258,22 @@ export default function ComparePage() {
                             <span className="text-muted-foreground">•</span>
                             <Badge variant="secondary" className={`text-xs font-bold ${getDifferenceBadgeClass(log.pnlDifference)}`}>
                               Diff: {log.pnlDifference >= 0 ? '+' : '-'}${Math.abs(log.pnlDifference).toFixed(2)}
+                            </Badge>
+                          </>
+                        )}
+                        {log.hadExistingCompare && log.previousComparePnl !== undefined && (
+                          <>
+                            <span className="text-muted-foreground">•</span>
+                            <span className={`text-xs ${getPnlColor(log.previousComparePnl)}`}>
+                              Prev: ${log.previousComparePnl.toFixed(2)}
+                            </span>
+                          </>
+                        )}
+                        {log.previousCompareDifference !== undefined && (
+                          <>
+                            <span className="text-muted-foreground">•</span>
+                            <Badge variant="secondary" className={`text-xs font-bold ${getDifferenceBadgeClass(log.previousCompareDifference)}`}>
+                              vs Prev: {log.previousCompareDifference >= 0 ? '+' : '-'}${Math.abs(log.previousCompareDifference).toFixed(2)}
                             </Badge>
                           </>
                         )}
