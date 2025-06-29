@@ -543,6 +543,24 @@ class TradingDataStore {
 
     return true;
   }
+
+  async deleteCompareByDate(date: string): Promise<boolean> {
+    await this.loadFromStorage('compare');
+    const compareData = this.endpoints.compare.data;
+    const initialLength = compareData.length;
+    
+    // Remove the compare data for the specified date
+    const updatedCompareData = compareData.filter(d => d.date !== date);
+    
+    if (updatedCompareData.length === initialLength) {
+      // No data was found for this date
+      return false;
+    }
+
+    this.endpoints.compare.data = updatedCompareData;
+    await this.saveToStorage('compare');
+    return true;
+  }
 }
 
 export const tradingDataStore = TradingDataStore.getInstance(); 

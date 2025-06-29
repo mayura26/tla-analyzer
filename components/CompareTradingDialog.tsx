@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DailyStats, TradeListEntry } from "@/lib/trading-log-parser";
 import { format, parseISO } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
-import { ArrowRight, CheckCircle2, Loader2, ChevronDown, ChevronRight } from "lucide-react";
+import { ArrowRight, CheckCircle2, Loader2, ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { compareTradingLogs } from "@/lib/trading-log-comparator";
@@ -35,6 +35,7 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
   const [hasUnsavedNotes, setHasUnsavedNotes] = useState(false);
   const [markedTrades, setMarkedTrades] = useState<Set<string>>(new Set());
   const [collapsedTrades, setCollapsedTrades] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Helper function to generate a unique key for a trade
   const getTradeKey = (trade: TradeListEntry) => {
@@ -289,6 +290,45 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
       toast.error("Failed to merge data");
     } finally {
       setIsMerging(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    // Show confirmation dialog
+    if (!confirm('Are you sure you want to delete this compare data? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setIsDeleting(true);
+      const formattedDate = getFormattedDate(baseStats.date);
+      const response = await fetch('/api/trading-data/compare/manage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'delete',
+          date: formattedDate
+        }),
+      });
+
+      if (response.ok) {
+        toast.success("Compare data successfully deleted");
+        // Call the parent's onMerge callback to refresh the data
+        if (onMerge) {
+          onMerge();
+        }
+        onClose();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to delete data");
+      }
+    } catch (error) {
+      console.error('Error deleting data:', error);
+      toast.error("Failed to delete data");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -871,7 +911,20 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
 
         <Separator />
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Button
+            onClick={handleDelete}
+            variant="destructive"
+            className="gap-2"
+            disabled={isDeleting || isLoading}
+          >
+            {isDeleting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Trash2 className="w-4 h-4" />
+            )}
+            {isDeleting ? "Deleting..." : "Delete Compare"}
+          </Button>
           <Button
             onClick={handleMerge}
             className="gap-2"

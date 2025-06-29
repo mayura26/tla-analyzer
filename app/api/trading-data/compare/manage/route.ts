@@ -112,9 +112,22 @@ export async function POST(request: Request) {
           message: 'All compare data for the week successfully merged to base data' 
         });
 
+      case 'delete':
+        const deleteResult = await tradingDataStore.deleteCompareByDate(date);
+        if (!deleteResult) {
+          return NextResponse.json(
+            { error: 'Compare data not found for the specified date' },
+            { status: 404 }
+          );
+        }
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Compare data successfully deleted' 
+        });
+
       default:
         return NextResponse.json(
-          { error: 'Invalid action. Supported actions: verify, addNotes, merge, mergeWeek' },
+          { error: 'Invalid action. Supported actions: verify, addNotes, merge, mergeWeek, delete' },
           { status: 400 }
         );
     }
