@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { TradingCard } from "@/components/trading-card";
 import type { WeekLog, DailyLog } from "@/lib/trading-data-store";
 import { DailyStats } from "@/lib/trading-log-parser";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, addDays } from "date-fns";
 import { TrendingUp, TrendingDown, Target, DollarSign } from "lucide-react";
 
 interface WeeklyLogAccordionProps {
@@ -75,17 +75,10 @@ export function WeeklyLogAccordion({ weeks, notesData, onNotesChange }: WeeklyLo
   return (
     <Accordion type="single" collapsible value={openWeek} onValueChange={setOpenWeek} className="w-full">
       {weeks.map((week) => {
-        // Calculate Monday and Sunday for the week based on weekStart (no timezone conversion)
-        const [sy, sm, sd] = week.weekStart.split('-');
-        const weekStartDate = new Date(Number(sy), Number(sm) - 1, Number(sd));
-        // Get the day of the week (0 = Sunday, 1 = Monday, ... 6 = Saturday)
-        const dayOfWeek = weekStartDate.getDay();
-        // Calculate Monday (if already Monday, stays the same)
-        const monday = new Date(weekStartDate);
-        monday.setDate(weekStartDate.getDate() - ((dayOfWeek + 6) % 7));
-        // Calculate Sunday
-        const sunday = new Date(monday);
-        sunday.setDate(monday.getDate() + 6);
+        // Use week.weekStart as Monday (no timezone conversion)
+        const monday = parseISO(week.weekStart);
+        // Calculate Sunday by adding 6 days
+        const sunday = addDays(monday, 6);
         return (
           <AccordionItem key={week.weekStart} value={week.weekStart} className="border rounded-lg mb-4">
             <AccordionTrigger className="px-6 py-4 hover:no-underline">
