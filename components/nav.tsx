@@ -33,6 +33,33 @@ const navItems = [
   }
 ];
 
+// Separate items for authenticated vs public access
+const publicNavItems = [
+  {
+    title: "Weekly Summary",
+    href: "/weekly"
+  }
+];
+
+const authenticatedNavItems = [
+  {
+    title: "Raw Data",
+    href: "/input"
+  },
+  {
+    title: "Compare Data",
+    href: "/compare"
+  },
+  {
+    title: "View Comparison",
+    href: "/compare/view"
+  },
+  {
+    title: "Admin",
+    href: "/admin"
+  }
+];
+
 export function Nav() {
   const pathname = usePathname();
   const { data: session, status } = useSession();
@@ -51,8 +78,29 @@ export function Nav() {
             </Link>
           </div>
           <div className="flex items-center gap-6">
-            {status === "authenticated" && navItems.map((item, index) => (
+            {/* Show Weekly Summary to all users */}
+            {publicNavItems.map((item, index) => (
               <React.Fragment key={item.href}>
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "text-sm font-medium transition-colors hover:text-primary",
+                    pathname === item.href
+                      ? "text-foreground"
+                      : "text-foreground/60"
+                  )}
+                >
+                  {item.title}
+                </Link>
+              </React.Fragment>
+            ))}
+            
+            {/* Show authenticated-only items */}
+            {status === "authenticated" && authenticatedNavItems.map((item, index) => (
+              <React.Fragment key={item.href}>
+                {index === 0 && (
+                  <div className="h-4 w-[1px] bg-gray-300 dark:bg-gray-700" />
+                )}
                 <Link
                   href={item.href}
                   className={cn(

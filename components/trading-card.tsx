@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { useState, useEffect } from "react"
 import { toast } from "sonner"
+import { useSession } from "next-auth/react"
 
 interface TradingCardProps {
   stats: DailyStats
@@ -27,6 +28,10 @@ export function TradingCard({ stats, notes: initialNotes = "", onNotesChange, me
   const [notes, setNotes] = useState(initialNotes)
   const [isSaving, setIsSaving] = useState(false)
   const [hasUnsavedNotes, setHasUnsavedNotes] = useState(false)
+  const { data: session, status } = useSession()
+
+  // Check if user is authenticated admin
+  const isAdmin = status === "authenticated" && session?.user?.role === "admin"
 
   // Update notes when prop changes
   useEffect(() => {
@@ -350,58 +355,78 @@ export function TradingCard({ stats, notes: initialNotes = "", onNotesChange, me
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="notes">
-            <AccordionTrigger className="hover:no-underline">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                <span className="font-medium">Notes</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pt-2 pb-2">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="notes">Trading Day Notes</Label>
-                  <Textarea
-                    id="notes"
-                    placeholder="Add any notes about this trading day..."
-                    value={notes}
-                    onChange={(e) => handleNotesChange(e.target.value)}
-                    className="min-h-[100px] resize-none"
-                    disabled={isSaving}
-                  />
+          {/* Only show notes section for authenticated admin users */}
+          {isAdmin && (
+            <AccordionItem value="notes">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  <span className="font-medium">Notes</span>
                 </div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-2 pb-2">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="notes">Trading Day Notes</Label>
+                    <Textarea
+                      id="notes"
+                      placeholder="Add any notes about this trading day..."
+                      value={notes}
+                      onChange={(e) => handleNotesChange(e.target.value)}
+                      className="min-h-[100px] resize-none"
+                      disabled={isSaving}
+                    />
+                  </div>
 
-                <div className="flex items-center justify-between">
-                  {isSaving && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Saving notes...
-                    </div>
-                  )}
-                  {hasUnsavedNotes && !isSaving && (
-                    <div className="text-sm text-muted-foreground">
-                      You have unsaved changes
-                    </div>
-                  )}
-                  <Button
-                    onClick={handleSaveNotes}
-                    disabled={!hasUnsavedNotes || isSaving}
-                    size="sm"
-                    className="ml-auto"
-                  >
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                        Saving...
-                      </>
-                    ) : (
-                      "Save Notes"
+                  <div className="flex items-center justify-between">
+                    {isSaving && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Saving notes...
+                      </div>
                     )}
-                  </Button>
+                    {hasUnsavedNotes && !isSaving && (
+                      <div className="text-sm text-muted-foreground">
+                        You have unsaved changes
+                      </div>
+                    )}
+                    <Button
+                      onClick={handleSaveNotes}
+                      disabled={!hasUnsavedNotes || isSaving}
+                      size="sm"
+                      className="ml-auto"
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Notes"
+                      )}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
+              </AccordionContent>
+            </AccordionItem>
+          )}
+
+          {/* Show read-only notes for non-admin users if notes exist */}
+          {!isAdmin && notes && notes.trim() && (
+            <AccordionItem value="notes">
+              <AccordionTrigger className="hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  <span className="font-medium">Notes</span>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-2 pb-2">
+                <div className="p-3 bg-muted/30 rounded-lg">
+                  <p className="text-sm whitespace-pre-wrap">{notes}</p>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          )}
         </Accordion>
       </CardContent>
 
