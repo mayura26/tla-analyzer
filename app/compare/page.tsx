@@ -23,6 +23,7 @@ interface SubmissionLog {
   hadExistingCompare?: boolean; // Whether there was existing compare data
   wasReplaced?: boolean; // Whether this submission replaced existing data
   replacedDataDeleted?: boolean; // Whether the replaced data has been deleted
+  baseNotes?: string; // Notes from base data
 }
 
 export default function ComparePage() {
@@ -87,17 +88,20 @@ export default function ComparePage() {
   };
 
   // Function to fetch base data for a specific date
-  const fetchBaseData = async (date: string): Promise<number | undefined> => {
+  const fetchBaseData = async (date: string): Promise<{ pnl?: number; notes?: string }> => {
     try {
       const response = await fetch(`/api/trading-data/base?date=${date}`);
       if (response.ok) {
         const baseData = await response.json();
-        return baseData.analysis.headline.totalPnl;
+        return {
+          pnl: baseData.analysis.headline.totalPnl,
+          notes: baseData.notes
+        };
       }
     } catch (error) {
       console.error('Error fetching base data:', error);
     }
-    return undefined;
+    return {};
   };
 
   // Function to fetch existing compare data for a specific date
@@ -201,12 +205,15 @@ export default function ComparePage() {
       if (result.success) {
         // Fetch base data if we have a date
         let basePnl: number | undefined;
+        let baseNotes: string | undefined;
         if (dataDate) {
           // Convert date format for API call (MM/DD/YYYY to YYYY-MM-DD)
           const dateParts = dataDate.split('/');
           if (dateParts.length === 3) {
             const apiDate = `${dateParts[2]}-${dateParts[0].padStart(2, '0')}-${dateParts[1].padStart(2, '0')}`;
-            basePnl = await fetchBaseData(apiDate);
+            const baseData = await fetchBaseData(apiDate);
+            basePnl = baseData.pnl;
+            baseNotes = baseData.notes;
           }
         }
 
@@ -235,6 +242,7 @@ export default function ComparePage() {
           hadExistingCompare: result.hadExistingCompare || hadExistingCompare,
           wasReplaced: result.replaced || false,
           replacedDataDeleted: false,
+          baseNotes,
         };
         
         setSubmissionLog(prev => [newSubmission, ...prev]);
@@ -285,76 +293,84 @@ export default function ComparePage() {
                   <h3 className="text-sm font-medium text-muted-foreground">Recent Submissions</h3>
                   <div className="space-y-1">
                     {submissionLog.map((log) => (
-                      <div key={log.id} className="flex items-center gap-2 text-sm">
-                        <Badge variant="secondary" className="text-xs">
-                          {log.dataDate || log.date}
-                        </Badge>
-                        {log.hadExistingCompare && (
-                          <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
-                            Updated
+                      <div key={log.id}>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Badge variant="secondary" className="text-xs">
+                            {log.dataDate ? `${log.dataDate} (${new Date(log.dataDate).toLocaleDateString('en-US', { weekday: 'short' })})` : log.date}
                           </Badge>
-                        )}
-                        {log.wasReplaced && (
-                          <Badge variant="outline" className="text-xs bg-red-100 text-red-800 border-red-300">
-                            Replaced
-                          </Badge>
-                        )}
-                        {log.replacedDataDeleted && (
-                          <Badge variant="outline" className="text-xs bg-gray-100 text-gray-600 border-gray-300">
-                            Deleted
-                          </Badge>
-                        )}
-                        <span className="text-muted-foreground">{log.time}</span>
-                        {log.submittedPnl !== undefined && (
-                          <>
-                            <span className="text-muted-foreground">•</span>
-                            <span className={`text-xs font-medium ${getPnlColor(log.submittedPnl)}`}>
-                              Submitted: ${log.submittedPnl.toFixed(2)}
-                            </span>
-                          </>
-                        )}
-                        {log.basePnl !== undefined && (
-                          <>
-                            <span className="text-muted-foreground">•</span>
-                            <span className={`text-xs ${getPnlColor(log.basePnl)}`}>
-                              Base: ${log.basePnl.toFixed(2)}
-                            </span>
-                          </>
-                        )}
-                        {log.pnlDifference !== undefined && (
-                          <>
-                            <span className="text-muted-foreground">•</span>
-                            <Badge variant="secondary" className={`text-xs font-bold ${getDifferenceBadgeClass(log.pnlDifference)}`}>
-                              Diff: {log.pnlDifference >= 0 ? '+' : '-'}${Math.abs(log.pnlDifference).toFixed(2)}
+                          {log.hadExistingCompare && (
+                            <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
+                              Updated
                             </Badge>
-                          </>
-                        )}
-                        {log.hadExistingCompare && log.previousComparePnl !== undefined && (
-                          <>
-                            <span className="text-muted-foreground">•</span>
-                            <span className={`text-xs ${getPnlColor(log.previousComparePnl)}`}>
-                              Prev: ${log.previousComparePnl.toFixed(2)}
-                            </span>
-                          </>
-                        )}
-                        {log.previousCompareDifference !== undefined && (
-                          <>
-                            <span className="text-muted-foreground">•</span>
-                            <Badge variant="secondary" className={`text-xs font-bold ${getDifferenceBadgeClass(log.previousCompareDifference)}`}>
-                              vs Prev: {log.previousCompareDifference >= 0 ? '+' : '-'}${Math.abs(log.previousCompareDifference).toFixed(2)}
+                          )}
+                          {log.wasReplaced && (
+                            <Badge variant="outline" className="text-xs bg-red-100 text-red-800 border-red-300">
+                              Replaced
                             </Badge>
-                          </>
-                        )}
-                        {log.wasReplaced && !log.replacedDataDeleted && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 ml-auto text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => handleDeleteReplacedCompare(log)}
-                            disabled={deletingIds.has(log.id)}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
+                          )}
+                          {log.replacedDataDeleted && (
+                            <Badge variant="outline" className="text-xs bg-gray-100 text-gray-600 border-gray-300">
+                              Deleted
+                            </Badge>
+                          )}
+                          <span className="text-muted-foreground">{log.time}</span>
+                          {log.submittedPnl !== undefined && (
+                            <>
+                              <span className="text-muted-foreground">•</span>
+                              <span className={`text-xs font-medium ${getPnlColor(log.submittedPnl)}`}>
+                                Submitted: ${log.submittedPnl.toFixed(2)}
+                              </span>
+                            </>
+                          )}
+                          {log.basePnl !== undefined && (
+                            <>
+                              <span className="text-muted-foreground">•</span>
+                              <span className={`text-xs ${getPnlColor(log.basePnl)}`}>
+                                Base: ${log.basePnl.toFixed(2)}
+                              </span>
+                            </>
+                          )}
+                          {log.pnlDifference !== undefined && (
+                            <>
+                              <span className="text-muted-foreground">•</span>
+                              <Badge variant="secondary" className={`text-xs font-bold ${getDifferenceBadgeClass(log.pnlDifference)}`}>
+                                Diff: {log.pnlDifference >= 0 ? '+' : '-'}${Math.abs(log.pnlDifference).toFixed(2)}
+                              </Badge>
+                            </>
+                          )}
+                          {log.hadExistingCompare && log.previousComparePnl !== undefined && (
+                            <>
+                              <span className="text-muted-foreground">•</span>
+                              <span className={`text-xs ${getPnlColor(log.previousComparePnl)}`}>
+                                Prev: ${log.previousComparePnl.toFixed(2)}
+                              </span>
+                            </>
+                          )}
+                          {log.previousCompareDifference !== undefined && (
+                            <>
+                              <span className="text-muted-foreground">•</span>
+                              <Badge variant="secondary" className={`text-xs font-bold ${getDifferenceBadgeClass(log.previousCompareDifference)}`}>
+                                vs Prev: {log.previousCompareDifference >= 0 ? '+' : '-'}${Math.abs(log.previousCompareDifference).toFixed(2)}
+                              </Badge>
+                            </>
+                          )}
+                          {log.wasReplaced && !log.replacedDataDeleted && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 ml-auto text-red-500 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => handleDeleteReplacedCompare(log)}
+                              disabled={deletingIds.has(log.id)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
+                        {log.baseNotes && log.baseNotes.trim() && (
+                          <div className="mt-2 ml-4 p-2 bg-muted/30 rounded-lg border-l-2 border-blue-400">
+                            <div className="text-xs font-medium text-blue-600 mb-1">Base Data Notes:</div>
+                            <div className="text-xs text-muted-foreground whitespace-pre-wrap">{log.baseNotes}</div>
+                          </div>
                         )}
                       </div>
                     ))}
