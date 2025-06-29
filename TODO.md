@@ -1,1 +1,0 @@
-[ ] Show day of week on compare logs

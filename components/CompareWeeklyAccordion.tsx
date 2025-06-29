@@ -189,6 +189,9 @@ export function CompareWeeklyAccordion({ weeks, onWeekMerged }: CompareWeeklyAcc
         const sunday = new Date(monday);
         sunday.setDate(monday.getDate() + 6);
 
+        // Filter days with both baseAnalysis and compareAnalysis
+        const daysWithData = week.days.filter((day: any) => day.baseAnalysis && day.compareAnalysis);
+
         // Calculate diffs for the week
         const diff = {
           pnlDiff: (week.compareHeadline.totalPnl || 0) - (week.baseHeadline.totalPnl || 0),
@@ -238,7 +241,7 @@ export function CompareWeeklyAccordion({ weeks, onWeekMerged }: CompareWeeklyAcc
                     </span>
                     <div className="flex items-center gap-4 mt-2">
                       <Badge variant="secondary" className="text-xs">
-                        {week.days.length} day{week.days.length !== 1 ? 's' : ''}
+                        {daysWithData.length} day{daysWithData.length !== 1 ? 's' : ''}
                       </Badge>
                       {diff.hasChanges && (
                         <>
