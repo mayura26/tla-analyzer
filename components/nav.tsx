@@ -10,29 +10,6 @@ import { useSession, signOut } from "next-auth/react";
 import { User, LogOut } from "lucide-react";
 import React from "react";
 
-const navItems = [
-  {
-    title: "Raw Data",
-    href: "/input"
-  },
-  {
-    title: "Compare Data",
-    href: "/compare"
-  },
-  {
-    title: "Weekly Summary",
-    href: "/weekly"
-  },
-  {
-    title: "View Comparison",
-    href: "/compare/view"
-  },
-  {
-    title: "Admin",
-    href: "/admin"
-  }
-];
-
 // Separate items for authenticated vs public access
 const publicNavItems = [
   {
@@ -79,7 +56,7 @@ export function Nav() {
           </div>
           <div className="flex items-center gap-6">
             {/* Show Weekly Summary to all users */}
-            {publicNavItems.map((item, index) => (
+            {publicNavItems.map((item) => (
               <React.Fragment key={item.href}>
                 <Link
                   href={item.href}
