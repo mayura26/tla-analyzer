@@ -236,25 +236,30 @@ export function CompareWeeklyAccordion({ weeks, onWeekMerged }: CompareWeeklyAcc
                     <span className="font-bold text-lg">
                       Week of {format(monday, 'MMM dd')} - {format(sunday, 'MMM dd, yyyy')}
                     </span>
-                    {diff.hasChanges && (
-                      <div className="flex items-center gap-4 mt-2">
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="w-4 h-4 text-muted-foreground" />
-                          <span className={`font-semibold ${getPnlDiffColor(diff.pnlDiff)}`}>
-                            {formatCurrency(diff.pnlDiff)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Target className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-muted-foreground">
-                            {diff.winsDiff >= 0 ? '+' : ''}{diff.winsDiff}W / {diff.lossesDiff >= 0 ? '+' : ''}{diff.lossesDiff}L
-                          </span>
-                        </div>
-                        <Badge variant="outline">
-                          {diff.tradesDiff >= 0 ? '+' : ''}{diff.tradesDiff} trades
-                        </Badge>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-4 mt-2">
+                      <Badge variant="secondary" className="text-xs">
+                        {week.days.length} day{week.days.length !== 1 ? 's' : ''}
+                      </Badge>
+                      {diff.hasChanges && (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="w-4 h-4 text-muted-foreground" />
+                            <span className={`font-semibold ${getPnlDiffColor(diff.pnlDiff)}`}>
+                              {formatCurrency(diff.pnlDiff)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Target className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-muted-foreground">
+                              {diff.winsDiff >= 0 ? '+' : ''}{diff.winsDiff}W / {diff.lossesDiff >= 0 ? '+' : ''}{diff.lossesDiff}L
+                            </span>
+                          </div>
+                          <Badge variant="outline">
+                            {diff.tradesDiff >= 0 ? '+' : ''}{diff.tradesDiff} trades
+                          </Badge>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {diff.hasChanges && getPnlIcon(diff.pnlDiff)}
