@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { X } from "lucide-react";
 
 interface SubmissionLog {
   id: string;
@@ -20,12 +21,15 @@ interface SubmissionLog {
   previousComparePnl?: number; // PnL from previous comparison data
   previousCompareDifference?: number; // Difference between submitted and previous compare PnL
   hadExistingCompare?: boolean; // Whether there was existing compare data
+  wasReplaced?: boolean; // Whether this submission replaced existing data
+  replacedDataDeleted?: boolean; // Whether the replaced data has been deleted
 }
 
 export default function ComparePage() {
   const [logData, setLogData] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionLog, setSubmissionLog] = useState<SubmissionLog[]>([]);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
 
   // Function to get PnL color based on value (same logic as trading card)
   const getPnlColor = (value: number) => {
@@ -110,6 +114,56 @@ export default function ComparePage() {
     return undefined;
   };
 
+  // Function to delete replaced compare data
+  const handleDeleteReplacedCompare = async (submission: SubmissionLog) => {
+    if (!submission.dataDate || !submission.wasReplaced) return;
+    
+    if (!confirm('Are you sure you want to delete this replaced comparison data? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setDeletingIds(prev => new Set(prev).add(submission.id));
+      
+      // Convert date format for API call (MM/DD/YYYY to YYYY-MM-DD)
+      const dateParts = submission.dataDate.split('/');
+      if (dateParts.length !== 3) {
+        throw new Error('Invalid date format');
+      }
+      const apiDate = `${dateParts[2]}-${dateParts[0].padStart(2, '0')}-${dateParts[1].padStart(2, '0')}`;
+      
+      const response = await fetch('/api/trading-data/compare/replaced', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ date: apiDate }),
+      });
+
+      if (response.ok) {
+        toast.success("Replaced comparison data successfully deleted");
+        // Update the submission to mark it as deleted instead of removing it
+        setSubmissionLog(prev => prev.map(log => 
+          log.id === submission.id 
+            ? { ...log, wasReplaced: false, replacedDataDeleted: true }
+            : log
+        ));
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to delete replaced comparison data");
+      }
+    } catch (error) {
+      console.error('Error deleting replaced comparison data:', error);
+      toast.error("Failed to delete replaced comparison data");
+    } finally {
+      setDeletingIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(submission.id);
+        return newSet;
+      });
+    }
+  };
+
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
@@ -179,6 +233,8 @@ export default function ComparePage() {
           previousComparePnl: result.previousPnl || previousComparePnl,
           previousCompareDifference,
           hadExistingCompare: result.hadExistingCompare || hadExistingCompare,
+          wasReplaced: result.replaced || false,
+          replacedDataDeleted: false,
         };
         
         setSubmissionLog(prev => [newSubmission, ...prev]);
@@ -238,6 +294,16 @@ export default function ComparePage() {
                             Updated
                           </Badge>
                         )}
+                        {log.wasReplaced && (
+                          <Badge variant="outline" className="text-xs bg-red-100 text-red-800 border-red-300">
+                            Replaced
+                          </Badge>
+                        )}
+                        {log.replacedDataDeleted && (
+                          <Badge variant="outline" className="text-xs bg-gray-100 text-gray-600 border-gray-300">
+                            Deleted
+                          </Badge>
+                        )}
                         <span className="text-muted-foreground">{log.time}</span>
                         {log.submittedPnl !== undefined && (
                           <>
@@ -278,6 +344,17 @@ export default function ComparePage() {
                               vs Prev: {log.previousCompareDifference >= 0 ? '+' : '-'}${Math.abs(log.previousCompareDifference).toFixed(2)}
                             </Badge>
                           </>
+                        )}
+                        {log.wasReplaced && !log.replacedDataDeleted && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 ml-auto text-red-500 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleDeleteReplacedCompare(log)}
+                            disabled={deletingIds.has(log.id)}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
                         )}
                       </div>
                     ))}

@@ -36,6 +36,19 @@ interface ReplacedCompareData {
   };
 }
 
+interface CurrentCompareData {
+  date: string;
+  analysis: {
+    headline: {
+      totalPnl: number;
+      totalTrades: number;
+      wins: number;
+      losses: number;
+    };
+    tradeList: TradeListEntry[];
+  };
+}
+
 export default function AdminPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState<string>("");
@@ -50,6 +63,8 @@ export default function AdminPage() {
   const [loadingReplacedData, setLoadingReplacedData] = useState(false);
   const [selectedReplacedData, setSelectedReplacedData] = useState<ReplacedCompareData | null>(null);
   const [isReplacedDialogOpen, setIsReplacedDialogOpen] = useState(false);
+  const [currentCompareDataMap, setCurrentCompareDataMap] = useState<Map<string, CurrentCompareData>>(new Map());
+  const [loadingCurrentDataMap, setLoadingCurrentDataMap] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchFileInfo();
@@ -81,6 +96,8 @@ export default function AdminPage() {
       if (response.ok) {
         const data = await response.json();
         setReplacedCompareData(data);
+        // Fetch current comparison data for each replaced item
+        fetchCurrentCompareDataForReplaced(data);
       } else {
         console.error('Failed to load replaced comparison data');
       }
@@ -89,6 +106,29 @@ export default function AdminPage() {
     } finally {
       setLoadingReplacedData(false);
     }
+  };
+
+  const fetchCurrentCompareDataForReplaced = async (replacedData: ReplacedCompareData[]) => {
+    const newCurrentDataMap = new Map<string, CurrentCompareData>();
+    const loadingSet = new Set<string>();
+
+    for (const item of replacedData) {
+      loadingSet.add(item.date);
+      try {
+        const response = await fetch(`/api/trading-data/compare/manage?date=${item.date}`);
+        if (response.ok) {
+          const currentData = await response.json();
+          newCurrentDataMap.set(item.date, currentData);
+        }
+      } catch (error) {
+        console.error(`Error fetching current comparison data for ${item.date}:`, error);
+      } finally {
+        loadingSet.delete(item.date);
+      }
+    }
+
+    setCurrentCompareDataMap(newCurrentDataMap);
+    setLoadingCurrentDataMap(loadingSet);
   };
 
   const handleDownload = async (filename: string) => {
@@ -271,6 +311,58 @@ export default function AdminPage() {
   const handleReplacedDataDelete = () => {
     // Refresh the replaced comparison data after deletion
     fetchReplacedCompareData();
+  };
+
+  const handleDeleteReplacedData = async (item: ReplacedCompareData, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent opening the dialog
+    
+    if (!confirm('Are you sure you want to delete this replaced comparison data? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/trading-data/compare/replaced', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          date: item.date
+        }),
+      });
+
+      if (response.ok) {
+        // Remove from local state immediately for better UX
+        setReplacedCompareData(prev => prev.filter(data => 
+          !(data.date === item.date && data.metadata?.replacedAt === item.metadata?.replacedAt)
+        ));
+        // Also remove from current data map
+        setCurrentCompareDataMap(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(item.date);
+          return newMap;
+        });
+      } else {
+        const error = await response.json();
+        alert(error.error || "Failed to delete replaced comparison data");
+      }
+    } catch (error) {
+      console.error('Error deleting replaced comparison data:', error);
+      alert("Failed to delete replaced comparison data");
+    }
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  };
+
+  const getPnlColor = (value: number) => {
+    return value >= 0 ? 'text-green-600' : 'text-red-600';
   };
 
   if (loading) {
@@ -701,54 +793,105 @@ export default function AdminPage() {
                 </div>
                 
                 <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {replacedCompareData.map((item) => (
-                    <div
-                      key={`${item.date}-${item.metadata?.replacedAt}`}
-                      className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => handleReplacedDataClick(item)}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="text-xs">
-                            {item.date}
-                          </Badge>
-                          <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
-                            Replaced
-                          </Badge>
+                  {replacedCompareData.map((item) => {
+                    const currentData = currentCompareDataMap.get(item.date);
+                    const isLoadingCurrent = loadingCurrentDataMap.has(item.date);
+                    const oldPnl = item.analysis.headline.totalPnl;
+                    const newPnl = currentData?.analysis.headline.totalPnl;
+                    const pnlDifference = newPnl !== undefined ? newPnl - oldPnl : undefined;
+
+                    return (
+                      <div
+                        key={`${item.date}-${item.metadata?.replacedAt}`}
+                        className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                        onClick={() => handleReplacedDataClick(item)}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-xs">
+                              {item.date}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
+                              Replaced
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <div title="View details">
+                              <Eye 
+                                className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" 
+                              />
+                            </div>
+                            <button
+                              onClick={(e) => handleDeleteReplacedData(item, e)}
+                              className="h-6 w-6 text-muted-foreground hover:text-red-600 hover:bg-red-50 hover:border-red-200 cursor-pointer transition-colors border border-muted-foreground/20 rounded flex items-center justify-center shadow-sm hover:shadow-md"
+                              title="Delete replaced comparison data"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M18 6 6 18" />
+                                <path d="m6 6 12 12" />
+                              </svg>
+                            </button>
+                          </div>
                         </div>
-                        <Eye className="h-4 w-4 text-muted-foreground" />
+                        
+                        {/* PnL Comparison */}
+                        <div className="mb-2">
+                          <div className="grid grid-cols-3 gap-2 text-sm">
+                            <div className="text-center">
+                              <div className="text-xs text-muted-foreground mb-1">Old PnL</div>
+                              <div className={`font-medium ${getPnlColor(oldPnl)}`}>
+                                {formatCurrency(oldPnl)}
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-muted-foreground mb-1">New PnL</div>
+                              <div className={`font-medium ${isLoadingCurrent ? 'text-muted-foreground' : newPnl !== undefined ? getPnlColor(newPnl) : 'text-muted-foreground'}`}>
+                                {isLoadingCurrent ? 'Loading...' : newPnl !== undefined ? formatCurrency(newPnl) : 'N/A'}
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-xs text-muted-foreground mb-1">Difference</div>
+                              <div className={`font-medium ${isLoadingCurrent ? 'text-muted-foreground' : pnlDifference !== undefined ? getPnlColor(pnlDifference) : 'text-muted-foreground'}`}>
+                                {isLoadingCurrent ? 'Loading...' : pnlDifference !== undefined ? formatCurrency(pnlDifference) : 'N/A'}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Other Stats */}
+                        <div className="grid grid-cols-3 gap-2 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Trades:</span>
+                            <span className="ml-1 font-medium">{item.analysis.headline.totalTrades}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Wins:</span>
+                            <span className="ml-1 font-medium text-green-600">{item.analysis.headline.wins}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Losses:</span>
+                            <span className="ml-1 font-medium text-red-600">{item.analysis.headline.losses}</span>
+                          </div>
+                        </div>
+                        
+                        {item.metadata?.replacedAt && (
+                          <div className="text-xs text-muted-foreground mt-2">
+                            Replaced: {new Date(item.metadata.replacedAt).toLocaleString()}
+                          </div>
+                        )}
                       </div>
-                      
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">PnL:</span>
-                          <span className={`ml-1 font-medium ${
-                            item.analysis.headline.totalPnl >= 0 ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            ${item.analysis.headline.totalPnl.toFixed(2)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Trades:</span>
-                          <span className="ml-1 font-medium">{item.analysis.headline.totalTrades}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Wins:</span>
-                          <span className="ml-1 font-medium text-green-600">{item.analysis.headline.wins}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Losses:</span>
-                          <span className="ml-1 font-medium text-red-600">{item.analysis.headline.losses}</span>
-                        </div>
-                      </div>
-                      
-                      {item.metadata?.replacedAt && (
-                        <div className="text-xs text-muted-foreground mt-2">
-                          Replaced: {new Date(item.metadata.replacedAt).toLocaleString()}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
