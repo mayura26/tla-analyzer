@@ -102,6 +102,55 @@ export interface WeekLog {
   } | null;
 }
 
+export interface MonthLog {
+  monthStart: string;
+  monthEnd: string;
+  days: DailyLog[];
+  monthHeadline: {
+    totalPnl: number;
+    totalTrades: number;
+    wins: number;
+    losses: number;
+    draws: number;
+    avgPnlPerTrade: number;
+    avgPnlPerDay: number;
+    totalDays: number;
+    profitableDays: number;
+    losingDays: number;
+    breakEvenDays: number;
+    maxDailyGain: number;
+    maxDailyLoss: number;
+    avgDailyGain: number;
+    avgDailyLoss: number;
+    bigWins: number;
+    bigLosses: number;
+    winRate: number;
+    netWinRate: number;
+  };
+  sessionBreakdown: {
+    morning: { pnl: number; trades: number; avgPnlPerTrade: number; days: number };
+    main: { pnl: number; trades: number; avgPnlPerTrade: number; days: number };
+    midday: { pnl: number; trades: number; avgPnlPerTrade: number; days: number };
+    afternoon: { pnl: number; trades: number; avgPnlPerTrade: number; days: number };
+    end: { pnl: number; trades: number; avgPnlPerTrade: number; days: number };
+  };
+  dayBreakdown: {
+    monday: { pnl: number; trades: number; days: number };
+    tuesday: { pnl: number; trades: number; days: number };
+    wednesday: { pnl: number; trades: number; days: number };
+    thursday: { pnl: number; trades: number; days: number };
+    friday: { pnl: number; trades: number; days: number };
+  };
+  pnlDistribution: {
+    highProfitDays: number;  // >$400
+    midProfitDays: number;   // $100-$400
+    lowProfitDays: number;   // $0-$100
+    lowLossDays: number;     // -$100-$0
+    midLossDays: number;     // -$400--$100
+    highLossDays: number;    // <-$400
+  };
+}
+
 type DataEndpoint = 'daily' | 'compare' | 'replaced-compare';
 
 class TradingDataStore {
@@ -306,12 +355,67 @@ class TradingDataStore {
 
     function getWeekStart(dateStr: string) {
       const [year, month, day] = dateStr.split('-').map(Number);
-      // Use UTC to avoid timezone conversions
-      const d = new Date(Date.UTC(year, month - 1, day));
-      const dayOfWeek = d.getUTCDay();
-      const diff = d.getUTCDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-      const monday = new Date(Date.UTC(year, month - 1, diff));
-      return monday.toISOString().split('T')[0];
+      // Use Zeller's congruence to calculate day of week without timezone issues
+      const m = month < 3 ? month + 12 : month;
+      const y = month < 3 ? year - 1 : year;
+      const c = Math.floor(y / 100);
+      const k = y % 100;
+      const h = (day + Math.floor((13 * (m + 1)) / 5) + k + Math.floor(k / 4) + Math.floor(c / 4) - 2 * c) % 7;
+      const days = ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+      const dayOfWeek = days.indexOf(days[h]);
+      
+      // Calculate days to subtract to get to Monday (1 = Monday, 0 = Sunday)
+      const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      
+      // Calculate the Monday of this week
+      const mondayDay = day - daysToSubtract;
+      
+      // Handle month/year boundaries
+      let mondayYear = year;
+      let mondayMonth = month;
+      let mondayDate = mondayDay;
+      
+      if (mondayDate < 1) {
+        // Previous month
+        if (mondayMonth === 1) {
+          mondayMonth = 12;
+          mondayYear--;
+        } else {
+          mondayMonth--;
+        }
+        // Get days in previous month
+        const daysInPrevMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        const isLeapYear = (mondayYear % 4 === 0 && mondayYear % 100 !== 0) || (mondayYear % 400 === 0);
+        const prevMonthDays = mondayMonth === 2 && isLeapYear ? 29 : daysInPrevMonth[mondayMonth - 1];
+        mondayDate = prevMonthDays + mondayDate;
+      }
+      
+      return `${mondayYear}-${mondayMonth.toString().padStart(2, '0')}-${mondayDate.toString().padStart(2, '0')}`;
+    }
+
+    function getWeekEnd(weekStart: string) {
+      const [year, month, day] = weekStart.split('-').map(Number);
+      
+      // Add 6 days to get Sunday
+      let endDay = day + 6;
+      let endMonth = month;
+      let endYear = year;
+      
+      // Handle month boundaries
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      const isLeapYear = (endYear % 4 === 0 && endYear % 100 !== 0) || (endYear % 400 === 0);
+      const currentMonthDays = endMonth === 2 && isLeapYear ? 29 : daysInMonth[endMonth - 1];
+      
+      if (endDay > currentMonthDays) {
+        endDay -= currentMonthDays;
+        endMonth++;
+        if (endMonth > 12) {
+          endMonth = 1;
+          endYear++;
+        }
+      }
+      
+      return `${endYear}-${endMonth.toString().padStart(2, '0')}-${endDay.toString().padStart(2, '0')}`;
     }
 
     const weekMap: Record<string, DailyLog[]> = {};
@@ -323,9 +427,7 @@ class TradingDataStore {
 
     const weekLogs: WeekLog[] = Object.entries(weekMap).map(([weekStart, days]) => {
       days.sort((a, b) => b.date.localeCompare(a.date));
-      // Use UTC to avoid timezone conversions
-      const [year, month, day] = weekStart.split('-').map(Number);
-      const weekEnd = new Date(Date.UTC(year, month - 1, day + 6));
+      const weekEnd = getWeekEnd(weekStart);
       const weekHeadline = days.reduce((acc, d) => {
         acc.totalPnl = (acc.totalPnl || 0) + (d.analysis.headline.totalPnl || 0);
         acc.totalTrades = (acc.totalTrades || 0) + (d.analysis.headline.totalTrades || 0);
@@ -335,7 +437,7 @@ class TradingDataStore {
       }, {} as any);
       return {
         weekStart,
-        weekEnd: weekEnd.toISOString().split('T')[0],
+        weekEnd,
         days,
         weekHeadline,
       };
@@ -343,6 +445,180 @@ class TradingDataStore {
 
     weekLogs.sort((a, b) => b.weekStart.localeCompare(a.weekStart));
     return weekLogs;
+  }
+
+  async groupLogsByMonth(): Promise<MonthLog[]> {
+    const allDays = await this.getLogs('daily');
+    if (!allDays.length) return [];
+
+    function getMonthStart(dateStr: string) {
+      const [year, month] = dateStr.split('-').map(Number);
+      return `${year}-${month.toString().padStart(2, '0')}-01`;
+    }
+
+    function getMonthEnd(dateStr: string) {
+      const [year, month] = dateStr.split('-').map(Number);
+      // Days in each month (non-leap year)
+      const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      
+      // Check for leap year
+      const isLeapYear = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+      const lastDay = month === 2 && isLeapYear ? 29 : daysInMonth[month - 1];
+      
+      return `${year}-${month.toString().padStart(2, '0')}-${lastDay}`;
+    }
+
+    function getDayOfWeek(dateStr: string): string {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      // Use Zeller's congruence to calculate day of week without timezone issues
+      const m = month < 3 ? month + 12 : month;
+      const y = month < 3 ? year - 1 : year;
+      const c = Math.floor(y / 100);
+      const k = y % 100;
+      const h = (day + Math.floor((13 * (m + 1)) / 5) + k + Math.floor(k / 4) + Math.floor(c / 4) - 2 * c) % 7;
+      const days = ['saturday', 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+      return days[h];
+    }
+
+    const monthMap: Record<string, DailyLog[]> = {};
+    for (const day of allDays) {
+      const monthStart = getMonthStart(day.date);
+      if (!monthMap[monthStart]) monthMap[monthStart] = [];
+      monthMap[monthStart].push(day);
+    }
+
+    const monthLogs: MonthLog[] = Object.entries(monthMap).map(([monthStart, days]) => {
+      days.sort((a, b) => b.date.localeCompare(a.date));
+      const monthEnd = getMonthEnd(monthStart);
+      
+      // Calculate month headline stats
+      const totalPnl = days.reduce((sum, d) => sum + (d.analysis.headline.totalPnl || 0), 0);
+      const totalTrades = days.reduce((sum, d) => sum + (d.analysis.headline.totalTrades || 0), 0);
+      const wins = days.reduce((sum, d) => sum + (d.analysis.headline.wins || 0), 0);
+      const losses = days.reduce((sum, d) => sum + (d.analysis.headline.losses || 0), 0);
+      const draws = totalTrades - wins - losses;
+      
+      // Calculate daily performance stats
+      const dailyPnls = days.map(d => d.analysis.headline.totalPnl || 0);
+      const profitableDays = dailyPnls.filter(pnl => pnl > 0).length;
+      const losingDays = dailyPnls.filter(pnl => pnl < 0).length;
+      const breakEvenDays = dailyPnls.filter(pnl => pnl === 0).length;
+      const maxDailyGain = Math.max(...dailyPnls);
+      const maxDailyLoss = Math.min(...dailyPnls);
+      const avgDailyGain = profitableDays > 0 ? dailyPnls.filter(pnl => pnl > 0).reduce((sum, pnl) => sum + pnl, 0) / profitableDays : 0;
+      const avgDailyLoss = losingDays > 0 ? dailyPnls.filter(pnl => pnl < 0).reduce((sum, pnl) => sum + pnl, 0) / losingDays : 0;
+
+      // Calculate big wins and losses (sum from daily headline data)
+      const bigWins = days.reduce((sum, d) => sum + (d.analysis.headline.bigWins || 0), 0);
+      const bigLosses = days.reduce((sum, d) => sum + (d.analysis.headline.bigLosses || 0), 0);
+
+      // Calculate win rates
+      const winRate = totalTrades > 0 ? (wins / totalTrades) * 100 : 0;
+      const netWinRate = totalTrades > 0 ? ((wins + draws) / totalTrades) * 100 : 0;
+
+      // Calculate daily PnL distribution into 6 zones
+      let highProfitDays = 0; // >$400
+      let midProfitDays = 0;  // $100-$400
+      let lowProfitDays = 0;  // $0-$100
+      let lowLossDays = 0;    // -$100-$0
+      let midLossDays = 0;    // -$400--$100
+      let highLossDays = 0;   // <-$400
+      for (const pnl of dailyPnls) {
+        if (pnl > 400) highProfitDays++;
+        else if (pnl > 100) midProfitDays++;
+        else if (pnl >= 0) lowProfitDays++;
+        else if (pnl >= -100) lowLossDays++;
+        else if (pnl >= -400) midLossDays++;
+        else highLossDays++;
+      }
+
+      // Calculate session breakdown
+      const sessionBreakdown = {
+        morning: { pnl: 0, trades: 0, avgPnlPerTrade: 0, days: 0 },
+        main: { pnl: 0, trades: 0, avgPnlPerTrade: 0, days: 0 },
+        midday: { pnl: 0, trades: 0, avgPnlPerTrade: 0, days: 0 },
+        afternoon: { pnl: 0, trades: 0, avgPnlPerTrade: 0, days: 0 },
+        end: { pnl: 0, trades: 0, avgPnlPerTrade: 0, days: 0 }
+      };
+
+      const sessionDays = { morning: 0, main: 0, midday: 0, afternoon: 0, end: 0 };
+
+      days.forEach(day => {
+        Object.entries(day.analysis.sessions).forEach(([session, data]) => {
+          if (session in sessionBreakdown) {
+            sessionBreakdown[session as keyof typeof sessionBreakdown].pnl += data.pnl || 0;
+            sessionBreakdown[session as keyof typeof sessionBreakdown].trades += data.trades || 0;
+            if (data.trades > 0) {
+              sessionDays[session as keyof typeof sessionDays]++;
+            }
+          }
+        });
+      });
+
+      // Calculate average PnL per trade for each session
+      Object.entries(sessionBreakdown).forEach(([session, data]) => {
+        data.days = sessionDays[session as keyof typeof sessionDays];
+        data.avgPnlPerTrade = data.trades > 0 ? data.pnl / data.trades : 0;
+      });
+
+      // Calculate day breakdown
+      const dayBreakdown = {
+        monday: { pnl: 0, trades: 0, days: 0 },
+        tuesday: { pnl: 0, trades: 0, days: 0 },
+        wednesday: { pnl: 0, trades: 0, days: 0 },
+        thursday: { pnl: 0, trades: 0, days: 0 },
+        friday: { pnl: 0, trades: 0, days: 0 }
+      };
+
+      days.forEach(day => {
+        const dayOfWeek = getDayOfWeek(day.date);
+        if (dayOfWeek in dayBreakdown) {
+          dayBreakdown[dayOfWeek as keyof typeof dayBreakdown].pnl += day.analysis.headline.totalPnl || 0;
+          dayBreakdown[dayOfWeek as keyof typeof dayBreakdown].trades += day.analysis.headline.totalTrades || 0;
+          dayBreakdown[dayOfWeek as keyof typeof dayBreakdown].days++;
+        }
+      });
+
+      return {
+        monthStart,
+        monthEnd,
+        days,
+        monthHeadline: {
+          totalPnl,
+          totalTrades,
+          wins,
+          losses,
+          draws,
+          avgPnlPerTrade: totalTrades > 0 ? totalPnl / totalTrades : 0,
+          avgPnlPerDay: days.length > 0 ? totalPnl / days.length : 0,
+          totalDays: days.length,
+          profitableDays,
+          losingDays,
+          breakEvenDays,
+          maxDailyGain,
+          maxDailyLoss,
+          avgDailyGain,
+          avgDailyLoss,
+          bigWins,
+          bigLosses,
+          winRate,
+          netWinRate
+        },
+        sessionBreakdown,
+        dayBreakdown,
+        pnlDistribution: {
+          highProfitDays,
+          midProfitDays,
+          lowProfitDays,
+          lowLossDays,
+          midLossDays,
+          highLossDays
+        }
+      };
+    });
+
+    monthLogs.sort((a, b) => b.monthStart.localeCompare(a.monthStart));
+    return monthLogs;
   }
 
   async updateCompareWithBase(mergeOptions: {

@@ -15,6 +15,10 @@ const publicNavItems = [
   {
     title: "Weekly Summary",
     href: "/weekly"
+  },
+  {
+    title: "Monthly Analysis",
+    href: "/monthly"
   }
 ];
 
