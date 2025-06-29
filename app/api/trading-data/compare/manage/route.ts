@@ -112,6 +112,19 @@ export async function POST(request: Request) {
           message: 'All compare data for the week successfully merged to base data' 
         });
 
+      case 'verifyWeek':
+        const verifyWeekResult = await tradingDataStore.verifyWeek(date, verifiedBy);
+        if (!verifyWeekResult) {
+          return NextResponse.json(
+            { error: 'No compare data found for the specified week' },
+            { status: 404 }
+          );
+        }
+        return NextResponse.json({ 
+          success: true, 
+          message: 'All compare data for the week successfully marked as verified' 
+        });
+
       case 'delete':
         const deleteResult = await tradingDataStore.deleteCompareByDate(date);
         if (!deleteResult) {
@@ -127,7 +140,7 @@ export async function POST(request: Request) {
 
       default:
         return NextResponse.json(
-          { error: 'Invalid action. Supported actions: verify, addNotes, merge, mergeWeek, delete' },
+          { error: 'Invalid action. Supported actions: verify, addNotes, merge, mergeWeek, verifyWeek, delete' },
           { status: 400 }
         );
     }

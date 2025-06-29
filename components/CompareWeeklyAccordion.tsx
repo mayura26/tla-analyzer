@@ -15,6 +15,7 @@ interface CompareWeeklyAccordionProps {
 export function CompareWeeklyAccordion({ weeks, onWeekMerged }: CompareWeeklyAccordionProps) {
   const [openWeek, setOpenWeek] = useState(weeks.length > 0 ? weeks[0].weekStart : "");
   const [mergeLoading, setMergeLoading] = useState<Record<string, boolean>>({});
+  const [verifyLoading, setVerifyLoading] = useState<Record<string, boolean>>({});
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -79,6 +80,48 @@ export function CompareWeeklyAccordion({ weeks, onWeekMerged }: CompareWeeklyAcc
       if (abs < 150) return 'text-red-400';
       if (abs < 300) return 'text-red-600 font-bold';
       return 'text-red-800 font-extrabold';
+    }
+  };
+
+  const verifyWeek = async (weekStart: string) => {
+    setVerifyLoading(prev => ({ ...prev, [weekStart]: true }));
+    
+    try {
+      const response = await fetch('/api/trading-data/compare/manage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'verifyWeek',
+          date: weekStart,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // Call the callback to notify parent component
+        if (onWeekMerged) {
+          onWeekMerged(weekStart);
+        }
+        // Show success toast
+        toast.success('Week verified successfully!', {
+          description: result.message || 'All compare data for the week has been marked as verified.'
+        });
+      } else {
+        console.error('Verification failed:', result.error);
+        toast.error('Failed to verify week data', {
+          description: result.error
+        });
+      }
+    } catch (error) {
+      console.error('Error verifying week:', error);
+      toast.error('Error verifying week data', {
+        description: 'An unexpected error occurred while verifying the week data.'
+      });
+    } finally {
+      setVerifyLoading(prev => ({ ...prev, [weekStart]: false }));
     }
   };
 
@@ -215,6 +258,25 @@ export function CompareWeeklyAccordion({ weeks, onWeekMerged }: CompareWeeklyAcc
                   </div>
                   <div className="flex items-center gap-2">
                     {diff.hasChanges && getPnlIcon(diff.pnlDiff)}
+                    <div
+                      className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 ml-2 cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        verifyWeek(week.weekStart);
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          verifyWeek(week.weekStart);
+                        }
+                      }}
+                    >
+                      <Target className="w-4 h-4 mr-1" />
+                      {verifyLoading[week.weekStart] ? 'Verifying...' : 'Verify Week'}
+                    </div>
                     <div
                       className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 ml-2 cursor-pointer"
                       onClick={(e) => {

@@ -552,20 +552,55 @@ class TradingDataStore {
     return true;
   }
 
-  async deleteCompareByDate(date: string): Promise<boolean> {
+  async verifyWeek(weekStart: string, verifiedBy?: string): Promise<boolean> {
+    // Get the compare data for all days in the week
     await this.loadFromStorage('compare');
     const compareData = this.endpoints.compare.data;
-    const initialLength = compareData.length;
-    
-    // Remove the compare data for the specified date
-    const updatedCompareData = compareData.filter(d => d.date !== date);
-    
-    if (updatedCompareData.length === initialLength) {
-      // No data was found for this date
+
+    // Calculate the week range using date strings to avoid timezone issues
+    const [year, month, day] = weekStart.split('-').map(Number);
+
+    // Create a temporary date object just for calculating the week boundaries
+    // Use UTC to avoid timezone issues
+    const weekStartDate = new Date(Date.UTC(year, month - 1, day));
+    const dayOfWeek = weekStartDate.getUTCDay();
+
+    // Calculate Monday of the week
+    const mondayOffset = (dayOfWeek + 6) % 7; // Days to subtract to get to Monday
+    const mondayDate = new Date(Date.UTC(year, month - 1, day - mondayOffset));
+
+    // Generate all 7 days of the week as YYYY-MM-DD strings
+    const weekDays: string[] = [];
+    for (let i = 0; i < 7; i++) {
+      const currentDate = new Date(Date.UTC(mondayDate.getUTCFullYear(), mondayDate.getUTCMonth(), mondayDate.getUTCDate() + i));
+      const dateString = currentDate.toISOString().split('T')[0];
+      weekDays.push(dateString);
+    }
+
+    // Find all compare data for the exact week days
+    const weekCompareData = compareData.filter(d => weekDays.includes(d.date));
+
+    if (weekCompareData.length === 0) {
       return false;
     }
 
-    this.endpoints.compare.data = updatedCompareData;
+    // Mark each day's compare data as verified
+    for (const compareDay of weekCompareData) {
+      const dayIndex = compareData.findIndex(d => d.date === compareDay.date);
+      if (dayIndex !== -1) {
+        const updatedDay = {
+          ...compareData[dayIndex],
+          metadata: {
+            ...compareData[dayIndex].metadata,
+            verified: true,
+            verifiedAt: new Date().toISOString(),
+            verifiedBy: verifiedBy || 'system'
+          }
+        };
+        compareData[dayIndex] = updatedDay;
+      }
+    }
+
     await this.saveToStorage('compare');
     return true;
   }
@@ -619,6 +654,24 @@ class TradingDataStore {
 
     this.endpoints['replaced-compare'].data = updatedReplacedCompareData;
     await this.saveToStorage('replaced-compare');
+    return true;
+  }
+
+  async deleteCompareByDate(date: string): Promise<boolean> {
+    await this.loadFromStorage('compare');
+    const compareData = this.endpoints.compare.data;
+    const initialLength = compareData.length;
+    
+    // Remove the compare data for the specified date
+    const updatedCompareData = compareData.filter(d => d.date !== date);
+    
+    if (updatedCompareData.length === initialLength) {
+      // No data was found for this date
+      return false;
+    }
+
+    this.endpoints.compare.data = updatedCompareData;
+    await this.saveToStorage('compare');
     return true;
   }
 }
