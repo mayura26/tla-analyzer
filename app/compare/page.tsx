@@ -168,7 +168,7 @@ export default function ComparePage() {
               placeholder="Paste your trading log data for comparison..."
               value={logData}
               onChange={(e) => setLogData(e.target.value)}
-              className="h-[400px] font-mono"
+              className="h-[200px] font-mono"
             />
             <Button 
               onClick={handleSubmit}
