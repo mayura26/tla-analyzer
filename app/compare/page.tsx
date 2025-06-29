@@ -210,7 +210,7 @@ export default function ComparePage() {
                           <>
                             <span className="text-muted-foreground">•</span>
                             <Badge variant="secondary" className={`text-xs font-bold ${getDifferenceBadgeClass(log.pnlDifference)}`}>
-                              Diff: {log.pnlDifference >= 0 ? '+' : ''}${Math.abs(log.pnlDifference).toFixed(2)}
+                              Diff: {log.pnlDifference >= 0 ? '+' : '-'}${Math.abs(log.pnlDifference).toFixed(2)}
                             </Badge>
                           </>
                         )}
