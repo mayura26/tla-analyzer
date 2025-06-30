@@ -8,24 +8,38 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, ChevronDown, ChevronUp, DollarSign, Target, TrendingUp, TrendingDown, EyeOff } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronUp, DollarSign, Target, TrendingUp, TrendingDown, EyeOff, FileText } from "lucide-react";
 import { ComparisonStats } from "@/lib/trading-comparison-stats-processor";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 
+interface CompareNote {
+  date: string;
+  notes: string;
+  comparePnl: number;
+  basePnl: number;
+  pnlDifference: number;
+  verified: boolean;
+  verifiedAt?: string;
+  verifiedBy?: string;
+}
+
 export default function CompareViewPage() {
   const [weeks, setWeeks] = useState<any[]>([]);
   const [stats, setStats] = useState<ComparisonStats | null>(null);
+  const [notesData, setNotesData] = useState<CompareNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statsExpanded, setStatsExpanded] = useState(false);
+  const [notesExpanded, setNotesExpanded] = useState(false);
   const [showOnlyUnverified, setShowOnlyUnverified] = useState(false);
 
   const fetchData = async () => {
     try {
-      const [weeksRes, statsRes] = await Promise.all([
+      const [weeksRes, statsRes, notesRes] = await Promise.all([
         fetch(`/api/trading-data/compare${showOnlyUnverified ? '?unverifiedOnly=true' : ''}`),
-        fetch(`/api/trading-data/compare/stats${showOnlyUnverified ? '?unverifiedOnly=true' : ''}`)
+        fetch(`/api/trading-data/compare/stats${showOnlyUnverified ? '?unverifiedOnly=true' : ''}`),
+        fetch(`/api/trading-data/compare/notes${showOnlyUnverified ? '?unverifiedOnly=true' : ''}`)
       ]);
 
       if (!weeksRes.ok) {
@@ -34,10 +48,14 @@ export default function CompareViewPage() {
       if (!statsRes.ok) {
         throw new Error(`Failed to fetch comparison stats: ${statsRes.statusText}`);
       }
+      if (!notesRes.ok) {
+        throw new Error(`Failed to fetch comparison notes: ${notesRes.statusText}`);
+      }
 
-      const [weeksData, statsData] = await Promise.all([
+      const [weeksData, statsData, notesData] = await Promise.all([
         weeksRes.json(),
-        statsRes.json()
+        statsRes.json(),
+        notesRes.json()
       ]);
 
       if (!Array.isArray(weeksData)) {
@@ -46,6 +64,7 @@ export default function CompareViewPage() {
 
       setWeeks(weeksData);
       setStats(statsData);
+      setNotesData(notesData);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Failed to load comparison data");
     } finally {
@@ -193,7 +212,7 @@ export default function CompareViewPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <DollarSign className="w-5 h-5" />
-                  Comparison Statistics
+                  Update Statistics
                 </CardTitle>
                 {statsExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
               </div>
@@ -206,7 +225,7 @@ export default function CompareViewPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <DollarSign className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm font-medium text-muted-foreground">Total PnL Difference</span>
+                        <span className="text-sm font-medium text-muted-foreground">Total PnL Change</span>
                       </div>
                       {stats.totalPnlDiff !== 0 && (
                         <div className="flex items-center gap-1 text-xs font-medium">
@@ -234,7 +253,7 @@ export default function CompareViewPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Target className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm font-medium text-muted-foreground">Total Trades Difference</span>
+                        <span className="text-sm font-medium text-muted-foreground">Total Trades Change</span>
                       </div>
                       {stats.totalTradesDiff !== 0 && (
                         <div className="flex items-center gap-1 text-xs font-medium">
@@ -261,7 +280,7 @@ export default function CompareViewPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Target className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm font-medium text-muted-foreground">Win/Loss Difference</span>
+                        <span className="text-sm font-medium text-muted-foreground">Win/Loss Change</span>
                       </div>
                       {getImprovementIndicator(stats.totalWinsDiff, 0)}
                     </div>
@@ -286,7 +305,7 @@ export default function CompareViewPage() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <Target className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm font-medium text-muted-foreground">Big Wins/Losses</span>
+                        <span className="text-sm font-medium text-muted-foreground">Big Wins/Losses Change</span>
                       </div>
                       {getImprovementIndicator(stats.totalBigWinsDiff, 0)}
                     </div>
@@ -316,9 +335,9 @@ export default function CompareViewPage() {
                       {getImprovementIndicator(stats.compareWinDrawLoss.wins, stats.baseWinDrawLoss.wins)}
                     </div>
 
-                    {/* Compare Data */}
+                    {/* Updated Data */}
                     <div className="space-y-2">
-                      <div className="text-xs font-medium text-blue-600">Compare Data</div>
+                      <div className="text-xs font-medium text-blue-600">Updated Data</div>
                       <div className="flex items-center space-x-1">
                         <div className="h-4 bg-green-600 rounded" style={{
                           width: `${((stats.compareWinDrawLoss.wins) / (stats.totalCompareTrades || 1)) * 100}%`
@@ -337,9 +356,9 @@ export default function CompareViewPage() {
                       </div>
                     </div>
 
-                    {/* Base Data */}
+                    {/* Original Data */}
                     <div className="space-y-2">
-                      <div className="text-xs font-medium text-orange-600">Base Data</div>
+                      <div className="text-xs font-medium text-orange-600">Original Data</div>
                       <div className="flex items-center space-x-1">
                         <div className="h-4 bg-green-600 rounded" style={{
                           width: `${((stats.baseWinDrawLoss.wins) / (stats.totalBaseTrades || 1)) * 100}%`
@@ -366,9 +385,9 @@ export default function CompareViewPage() {
                       {getImprovementIndicator(stats.compareGreenRed.greenDays, stats.baseGreenRed.greenDays)}
                     </div>
 
-                    {/* Compare Data */}
+                    {/* Updated Data */}
                     <div className="space-y-2">
-                      <div className="text-xs font-medium text-blue-600">Compare Data</div>
+                      <div className="text-xs font-medium text-blue-600">Updated Data</div>
                       <div className="flex items-center space-x-1">
                         <div className="h-4 bg-green-600 rounded" style={{
                           width: `${((stats.compareGreenRed.greenDays) / (stats.compareGreenRed.greenDays + stats.compareGreenRed.redDays || 1)) * 100}%`
@@ -383,9 +402,9 @@ export default function CompareViewPage() {
                       </div>
                     </div>
 
-                    {/* Base Data */}
+                    {/* Original Data */}
                     <div className="space-y-2">
-                      <div className="text-xs font-medium text-orange-600">Base Data</div>
+                      <div className="text-xs font-medium text-orange-600">Original Data</div>
                       <div className="flex items-center space-x-1">
                         <div className="h-4 bg-green-600 rounded" style={{
                           width: `${((stats.baseGreenRed.greenDays) / (stats.baseGreenRed.greenDays + stats.baseGreenRed.redDays || 1)) * 100}%`
@@ -435,13 +454,13 @@ export default function CompareViewPage() {
                               </span>
                             </div>
                             <div className="flex items-center text-xs">
-                              <div className="w-12 text-blue-500">Comp</div>
+                              <div className="w-12 text-blue-500">Updated</div>
                               <div className="flex-1 bg-muted/50 rounded-sm">
                                 <div className={`${item.className} h-3 rounded-sm`} style={{ width: `${((item.compareCount || 0) / maxCount) * 100}%` }} />
                               </div>
                             </div>
                             <div className="flex items-center text-xs mt-1">
-                              <div className="w-12 text-orange-500">Base</div>
+                              <div className="w-12 text-orange-500">Original</div>
                               <div className="flex-1 bg-muted/50 rounded-sm">
                                 <div className={`${item.className} h-3 rounded-sm`} style={{ width: `${((item.baseCount || 0) / maxCount) * 100}%` }} />
                               </div>
@@ -466,11 +485,11 @@ export default function CompareViewPage() {
                         <span className="font-medium">{stats.totalWeeks}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Compare Trades:</span>
+                        <span className="text-muted-foreground">Updated Trades:</span>
                         <span className="font-medium">{stats.totalCompareTrades}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Base Trades:</span>
+                        <span className="text-muted-foreground">Original Trades:</span>
                         <span className="font-medium">{stats.totalBaseTrades}</span>
                       </div>
                     </div>
@@ -479,6 +498,64 @@ export default function CompareViewPage() {
               </CardContent>
             )}
           </Card>
+
+          {/* Compare Notes Log */}
+          {notesData.length > 0 && (
+            <Card className="mb-6">
+              <CardHeader
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => setNotesExpanded(!notesExpanded)}
+              >
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Updated Notes Log
+                    <Badge variant="secondary" className="ml-2">
+                      {notesData.length} notes
+                    </Badge>
+                  </CardTitle>
+                  {notesExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                </div>
+              </CardHeader>
+              {notesExpanded && (
+                <CardContent>
+                  <div className="space-y-4">
+                    {notesData.map((note, index) => (
+                      <div key={index} className={`p-4 rounded-lg border ${note.verified ? 'border-green-500/30 bg-green-500/10' : 'border-muted'}`}>
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{note.date}</span>
+                            {note.verified && (
+                              <Badge variant="outline" className="text-green-600 border-green-600">
+                                Verified
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right">
+                              <div className="text-sm text-muted-foreground">Updated: {formatCurrency(note.comparePnl)}</div>
+                              <div className="text-sm text-muted-foreground">Original: {formatCurrency(note.basePnl)}</div>
+                            </div>
+                            <div className={`flex items-center gap-1 ${getPnlColor(note.pnlDifference)}`}>
+                              {getPnlIcon(note.pnlDifference)}
+                              <span className="font-bold">{formatCurrency(note.pnlDifference)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-sm whitespace-pre-wrap">{note.notes}</div>
+                        {note.verified && note.verifiedAt && (
+                          <div className="text-xs text-muted-foreground mt-2">
+                            Verified {new Date(note.verifiedAt).toLocaleDateString()}
+                            {note.verifiedBy && ` by ${note.verifiedBy}`}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          )}
 
           <CompareWeeklyAccordion weeks={weeks} onWeekMerged={handleWeekMerged} />
         </>
