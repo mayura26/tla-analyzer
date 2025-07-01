@@ -193,13 +193,22 @@ export function CompareWeeklyAccordion({ weeks, onWeekMerged }: CompareWeeklyAcc
         const daysWithData = week.days.filter((day: any) => day.baseAnalysis && day.compareAnalysis);
 
         // Calculate diffs for the week
+        // Calculate sum of daily PnL diffs for the week
+        let sumDailyPnlDiff = 0;
+        week.days.forEach((day: any) => {
+          const baseStats = day.baseAnalysis ? transformToDailyStats(day.baseAnalysis, day.date) : null;
+          const compareStats = day.compareAnalysis ? transformToDailyStats(day.compareAnalysis, day.date) : null;
+          if (baseStats && compareStats) {
+            sumDailyPnlDiff += (compareStats.totalPnl - baseStats.totalPnl);
+          }
+        });
         const diff = {
-          pnlDiff: (week.compareHeadline.totalPnl || 0) - (week.baseHeadline.totalPnl || 0),
+          pnlDiff: sumDailyPnlDiff,
           tradesDiff: (week.compareHeadline.totalTrades || 0) - (week.baseHeadline.totalTrades || 0),
           winsDiff: (week.compareHeadline.wins || 0) - (week.baseHeadline.wins || 0),
           lossesDiff: (week.compareHeadline.losses || 0) - (week.baseHeadline.losses || 0),
           hasChanges:
-            (week.compareHeadline.totalPnl || 0) !== (week.baseHeadline.totalPnl || 0) ||
+            sumDailyPnlDiff !== 0 ||
             (week.compareHeadline.totalTrades || 0) !== (week.baseHeadline.totalTrades || 0) ||
             (week.compareHeadline.wins || 0) !== (week.baseHeadline.wins || 0) ||
             (week.compareHeadline.losses || 0) !== (week.baseHeadline.losses || 0)
