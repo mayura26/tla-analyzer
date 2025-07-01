@@ -8,6 +8,7 @@ export interface Trade {
   pnl: number;
   points: number;
   exitReason: 'TP' | 'SL' | 'MANUAL';
+  detailedExitReason?: string;
   isChaseTrade: boolean;
 }
 
@@ -89,6 +90,7 @@ export interface TradeListEntry {
     pnl: number;
     points: number;
     exitReason: 'TP' | 'SL' | 'MANUAL';
+    detailedExitReason?: string;
     exitTimestamp: Date;
   }[];
   isChaseTrade: boolean;
@@ -325,11 +327,23 @@ export function parseTradingLog(logData: string): TradingLogAnalysis {
     }
 
     // Trade close (including partial exits)
-    const closeMatch = line.match(/\[TRADE CLOSE(?: - (TP|SL))? \(ID: (\d+)\)\] TRADE CLOSED:.*at Price: ([\d.]+)/);
+    const closeMatch = line.match(/\[TRADE CLOSE(?: - (TP|SL))? \(ID: (\d+)\)\] TRADE CLOSED:.*?\((.*?)\) at Price: ([\d.]+)/);
     if (closeMatch && timestamp) {
       const id = parseInt(closeMatch[2]);
-      const exitReason = (closeMatch[1] || 'MANUAL') as 'TP' | 'SL' | 'MANUAL';
-      const exitPrice = parseFloat(closeMatch[3]);
+      const detailedReason = closeMatch[3] || '';
+      const exitPrice = parseFloat(closeMatch[4]);
+      
+      // Determine exit reason based on the detailed reason
+      let exitReason: 'TP' | 'SL' | 'MANUAL' = 'MANUAL';
+      if (closeMatch[1]) {
+        exitReason = closeMatch[1] as 'TP' | 'SL';
+      } else if (detailedReason.toLowerCase().includes('predictive exit')) {
+        exitReason = 'MANUAL'; // Predictive exits are manual decisions
+      } else if (detailedReason.toLowerCase().includes('stop loss') || detailedReason.toLowerCase().includes('sl')) {
+        exitReason = 'SL';
+      } else if (detailedReason.toLowerCase().includes('take profit') || detailedReason.toLowerCase().includes('tp')) {
+        exitReason = 'TP';
+      }
       
       const trade = tradeMap[id];
       if (trade && trade.subTrades) {
@@ -340,6 +354,7 @@ export function parseTradingLog(logData: string): TradingLogAnalysis {
           pnl: 0, // Will be set in PnL update
           points: 0, // Will be set in PnL update
           exitReason,
+          detailedExitReason: detailedReason,
           exitTimestamp: timestamp
         });
       }

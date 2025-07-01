@@ -416,6 +416,11 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
                       <div>
                         exitReason: <span className={oldSub && newSub && oldSub.exitReason !== newSub.exitReason ? 'bg-yellow-900/40 px-1 rounded' : ''}>{oldSub.exitReason}</span>
                       </div>
+                      {oldSub.detailedExitReason && (
+                        <div>
+                          detailedReason: <span className={oldSub && newSub && oldSub.detailedExitReason !== newSub.detailedExitReason ? 'bg-yellow-900/40 px-1 rounded' : ''}>{oldSub.detailedExitReason}</span>
+                        </div>
+                      )}
                     </>
                   ) : <span className="italic text-muted-foreground">—</span>}
                 </div>
@@ -437,6 +442,11 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
                       <div>
                         exitReason: <span className={oldSub && newSub && oldSub.exitReason !== newSub.exitReason ? 'bg-yellow-900/40 px-1 rounded' : ''}>{newSub.exitReason}</span>
                       </div>
+                      {newSub.detailedExitReason && (
+                        <div>
+                          detailedReason: <span className={oldSub && newSub && oldSub.detailedExitReason !== newSub.detailedExitReason ? 'bg-yellow-900/40 px-1 rounded' : ''}>{newSub.detailedExitReason}</span>
+                        </div>
+                      )}
                     </>
                   ) : <span className="italic text-muted-foreground">—</span>}
                 </div>
@@ -622,6 +632,11 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
                   </div>
                   <span className={`${getPnlColor(subTrade.pnl)}`}>{formatCurrency(subTrade.pnl)}</span>
                 </div>
+                {subTrade.detailedExitReason && (
+                  <div className="text-xs text-muted-foreground pl-4 mt-1">
+                    {subTrade.detailedExitReason}
+                  </div>
+                )}
               </div>
             ))}
           </div>

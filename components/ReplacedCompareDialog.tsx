@@ -3,11 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { TradeListEntry } from "@/lib/trading-log-parser";
 import { format, parseISO } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
-import { Loader2, Trash2, CheckCircle2, ChevronDown, ChevronRight, ArrowRight } from "lucide-react";
+import { Loader2, Trash2, CheckCircle2, ChevronDown, ChevronRight, ArrowRight, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { compareTradingLogs } from "@/lib/trading-log-comparator";
 import { toast } from "sonner";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 interface ReplacedCompareData {
   date: string;
@@ -25,6 +26,7 @@ interface ReplacedCompareData {
     replacedReason?: string;
     originalDate?: string;
     addedAt?: string;
+    notes?: string;
   };
 }
 
@@ -38,6 +40,9 @@ interface CurrentCompareData {
       losses: number;
     };
     tradeList: TradeListEntry[];
+  };
+  metadata?: {
+    notes?: string;
   };
 }
 
@@ -59,6 +64,8 @@ export function ReplacedCompareDialog({
   const [collapsedTrades, setCollapsedTrades] = useState<Set<string>>(new Set());
   const [currentCompareData, setCurrentCompareData] = useState<CurrentCompareData | null>(null);
   const [loadingCurrentData, setLoadingCurrentData] = useState(false);
+  const [baseNotes, setBaseNotes] = useState<string>("");
+  const [loadingNotes, setLoadingNotes] = useState(false);
 
   // Helper function to generate a unique key for a trade
   const getTradeKey = (trade: TradeListEntry) => {
@@ -69,6 +76,7 @@ export function ReplacedCompareDialog({
   React.useEffect(() => {
     if (isOpen && replacedData) {
       fetchCurrentCompareData();
+      fetchNotes();
     }
   }, [isOpen, replacedData]);
 
@@ -88,6 +96,31 @@ export function ReplacedCompareDialog({
       console.error('Error fetching current comparison data:', error);
     } finally {
       setLoadingCurrentData(false);
+    }
+  };
+
+  const fetchNotes = async () => {
+    if (!replacedData) return;
+    
+    try {
+      setLoadingNotes(true);
+      const response = await fetch(`/api/trading-data/notes?date=${replacedData.date}`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.data && data.data.notes) {
+          setBaseNotes(data.data.notes);
+        } else {
+          setBaseNotes("");
+        }
+      } else {
+        console.error('Failed to load base notes');
+        setBaseNotes("");
+      }
+    } catch (error) {
+      console.error('Error fetching base notes:', error);
+      setBaseNotes("");
+    } finally {
+      setLoadingNotes(false);
     }
   };
 
@@ -203,7 +236,8 @@ export function ReplacedCompareDialog({
         oldSub.quantity !== newSub.quantity ||
         oldSub.pnl !== newSub.pnl ||
         oldSub.points !== newSub.points ||
-        oldSub.exitReason !== newSub.exitReason
+        oldSub.exitReason !== newSub.exitReason ||
+        oldSub.detailedExitReason !== newSub.detailedExitReason
       ) { hasDiff = true; break; }
     }
     if (!hasDiff) return null;
@@ -240,6 +274,11 @@ export function ReplacedCompareDialog({
                       <div>
                         exitReason: <span className={oldSub && newSub && oldSub.exitReason !== newSub.exitReason ? 'bg-yellow-900/40 px-1 rounded' : ''}>{oldSub.exitReason}</span>
                       </div>
+                      {oldSub.detailedExitReason && (
+                        <div>
+                          detailedReason: <span className={oldSub && newSub && oldSub.detailedExitReason !== newSub.detailedExitReason ? 'bg-yellow-900/40 px-1 rounded' : ''}>{oldSub.detailedExitReason}</span>
+                        </div>
+                      )}
                     </>
                   ) : <span className="italic text-muted-foreground">—</span>}
                 </div>
@@ -261,6 +300,11 @@ export function ReplacedCompareDialog({
                       <div>
                         exitReason: <span className={oldSub && newSub && oldSub.exitReason !== newSub.exitReason ? 'bg-yellow-900/40 px-1 rounded' : ''}>{newSub.exitReason}</span>
                       </div>
+                      {newSub.detailedExitReason && (
+                        <div>
+                          detailedReason: <span className={oldSub && newSub && oldSub.detailedExitReason !== newSub.detailedExitReason ? 'bg-yellow-900/40 px-1 rounded' : ''}>{newSub.detailedExitReason}</span>
+                        </div>
+                      )}
                     </>
                   ) : <span className="italic text-muted-foreground">—</span>}
                 </div>
@@ -440,6 +484,11 @@ export function ReplacedCompareDialog({
                   </div>
                   <span className={`${getPnlColor(subTrade.pnl)}`}>{formatCurrency(subTrade.pnl)}</span>
                 </div>
+                {subTrade.detailedExitReason && (
+                  <div className="text-xs text-muted-foreground pl-4 mt-1">
+                    {subTrade.detailedExitReason}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -697,6 +746,99 @@ export function ReplacedCompareDialog({
                 )}
               </div>
             </div>
+          )}
+        </div>
+
+        {/* Notes Section */}
+        <div className="space-y-4">
+          <div className="text-lg font-semibold">Notes</div>
+          
+          {/* Loading state for notes */}
+          {loadingNotes && (
+            <div className="flex items-center justify-center py-4">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Loading notes...</span>
+              </div>
+            </div>
+          )}
+
+          {/* Notes content */}
+          {!loadingNotes && (
+            <Accordion type="multiple" className="w-full">
+              {/* Replaced Compare Notes */}
+              {replacedData.metadata?.notes && replacedData.metadata.notes.trim() && (
+                <AccordionItem value="replaced-notes">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-2 w-full">
+                      <FileText className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Replaced Compare Notes</span>
+                      <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300 text-xs">
+                        Replaced
+                      </Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="pt-2 pb-2">
+                      <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 rounded-md p-3 border border-muted-foreground/20">
+                        {replacedData.metadata.notes}
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              )}
+
+              {/* Base Notes */}
+              {baseNotes && baseNotes.trim() && (
+                <AccordionItem value="base-notes">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-2 w-full">
+                      <FileText className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium text-muted-foreground">Base Day Notes</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="pt-2 pb-2">
+                      <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 rounded-md p-3 border border-muted-foreground/20">
+                        {baseNotes}
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              )}
+
+              {/* Current Compare Notes */}
+              {currentCompareData?.metadata?.notes && currentCompareData.metadata.notes.trim() && (
+                <AccordionItem value="current-notes">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-2 w-full">
+                      <FileText className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Current Compare Notes</span>
+                      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">
+                        Current
+                      </Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="pt-2 pb-2">
+                      <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 rounded-md p-3 border border-muted-foreground/20">
+                        {currentCompareData.metadata.notes}
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              )}
+
+              {/* No notes message */}
+              {!loadingNotes && 
+               (!replacedData.metadata?.notes || !replacedData.metadata.notes.trim()) &&
+               (!baseNotes || !baseNotes.trim()) &&
+               (!currentCompareData?.metadata?.notes || !currentCompareData.metadata.notes.trim()) && (
+                <div className="text-center py-8 text-muted-foreground">
+                  <p>No notes available for this comparison</p>
+                </div>
+              )}
+            </Accordion>
           )}
         </div>
 

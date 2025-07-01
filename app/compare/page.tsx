@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { X } from "lucide-react";
+import { X, Eye } from "lucide-react";
+import { ReplacedCompareDialog } from "@/components/ReplacedCompareDialog";
 
 interface SubmissionLog {
   id: string;
@@ -31,6 +32,8 @@ export default function ComparePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionLog, setSubmissionLog] = useState<SubmissionLog[]>([]);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [replacedCompareDialogOpen, setReplacedCompareDialogOpen] = useState(false);
+  const [selectedReplacedData, setSelectedReplacedData] = useState<any>(null);
 
   // Function to get PnL color based on value (same logic as trading card)
   const getPnlColor = (value: number) => {
@@ -118,6 +121,32 @@ export default function ComparePage() {
     return undefined;
   };
 
+  // Function to fetch and open replaced comparison dialog
+  const handleViewReplacedCompare = async (submission: SubmissionLog) => {
+    if (!submission.dataDate) return;
+    
+    try {
+      // Convert date format for API call (MM/DD/YYYY to YYYY-MM-DD)
+      const dateParts = submission.dataDate.split('/');
+      if (dateParts.length !== 3) {
+        throw new Error('Invalid date format');
+      }
+      const apiDate = `${dateParts[2]}-${dateParts[0].padStart(2, '0')}-${dateParts[1].padStart(2, '0')}`;
+      
+      const response = await fetch(`/api/trading-data/compare/replaced?date=${apiDate}`);
+      if (response.ok) {
+        const replacedData = await response.json();
+        setSelectedReplacedData(replacedData);
+        setReplacedCompareDialogOpen(true);
+      } else {
+        toast.error("No replaced comparison data found for this date");
+      }
+    } catch (error) {
+      console.error('Error fetching replaced comparison data:', error);
+      toast.error("Failed to fetch replaced comparison data");
+    }
+  };
+
   // Function to delete replaced compare data
   const handleDeleteReplacedCompare = async (submission: SubmissionLog) => {
     if (!submission.dataDate || !submission.wasReplaced) return;
@@ -165,6 +194,31 @@ export default function ComparePage() {
         newSet.delete(submission.id);
         return newSet;
       });
+    }
+  };
+
+  // Function to handle dialog close
+  const handleDialogClose = () => {
+    setReplacedCompareDialogOpen(false);
+    setSelectedReplacedData(null);
+  };
+
+  // Function to handle replaced data deletion from dialog
+  const handleReplacedDataDeleted = () => {
+    // Update the submission log to mark the replaced data as deleted
+    if (selectedReplacedData) {
+      setSubmissionLog(prev => prev.map(log => {
+        if (log.dataDate) {
+          const dateParts = log.dataDate.split('/');
+          if (dateParts.length === 3) {
+            const apiDate = `${dateParts[2]}-${dateParts[0].padStart(2, '0')}-${dateParts[1].padStart(2, '0')}`;
+            if (apiDate === selectedReplacedData.date) {
+              return { ...log, wasReplaced: false, replacedDataDeleted: true };
+            }
+          }
+        }
+        return log;
+      }));
     }
   };
 
@@ -355,15 +409,27 @@ export default function ComparePage() {
                             </>
                           )}
                           {log.wasReplaced && !log.replacedDataDeleted && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-6 w-6 p-0 ml-auto text-red-500 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => handleDeleteReplacedCompare(log)}
-                              disabled={deletingIds.has(log.id)}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
+                            <div className="flex items-center gap-1 ml-auto">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50"
+                                onClick={() => handleViewReplacedCompare(log)}
+                                title="View replaced comparison data"
+                              >
+                                <Eye className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => handleDeleteReplacedCompare(log)}
+                                disabled={deletingIds.has(log.id)}
+                                title="Delete replaced comparison data"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
                           )}
                         </div>
                         {log.baseNotes && log.baseNotes.trim() && (
@@ -381,6 +447,14 @@ export default function ComparePage() {
           </div>
         </CardContent>
       </Card>
+      
+      {/* Replaced Compare Dialog */}
+      <ReplacedCompareDialog
+        isOpen={replacedCompareDialogOpen}
+        onClose={handleDialogClose}
+        replacedData={selectedReplacedData}
+        onDelete={handleReplacedDataDeleted}
+      />
     </div>
   );
 }
