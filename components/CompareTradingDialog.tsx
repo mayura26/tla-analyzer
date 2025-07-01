@@ -29,6 +29,7 @@ type SessionKey = keyof DailyStats['sessionBreakdown'];
 export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats, onMerge, onVerificationChange, onNotesChange }: CompareTradingDialogProps) {
   const [isVerified, setIsVerified] = useState(false);
   const [notes, setNotes] = useState("");
+  const [baseDayNotes, setBaseDayNotes] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
@@ -162,12 +163,27 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
       setIsLoading(true);
       const formattedDate = getFormattedDate(baseStats.date);
       console.log('Loading metadata for date:', baseStats.date, '-> formatted:', formattedDate);
-      const response = await fetch(`/api/trading-data/compare/manage?date=${formattedDate}`);
-      if (response.ok) {
-        const data = await response.json();
+      
+      // Load both compare metadata and base day notes
+      const [metadataResponse, baseNotesResponse] = await Promise.all([
+        fetch(`/api/trading-data/compare/manage?date=${formattedDate}`),
+        fetch(`/api/trading-data/notes?date=${formattedDate}`)
+      ]);
+      
+      if (metadataResponse.ok) {
+        const data = await metadataResponse.json();
         if (data.metadata) {
           setIsVerified(data.metadata.verified || false);
           setNotes(data.metadata.notes || "");
+        }
+      }
+      
+      if (baseNotesResponse.ok) {
+        const baseNotesData = await baseNotesResponse.json();
+        if (baseNotesData.success && baseNotesData.data && baseNotesData.data.notes) {
+          setBaseDayNotes(baseNotesData.data.notes);
+        } else {
+          setBaseDayNotes("");
         }
       }
     } catch (error) {
@@ -871,41 +887,54 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
 
         <Separator />
 
-        <div className="space-y-2">
-          <Label>Notes</Label>
-          <Textarea
-            placeholder="Add any notes about the changes or verification..."
-            value={notes}
-            onChange={(e) => handleNotesChange(e.target.value)}
-            className="min-h-[100px]"
-            disabled={isLoading}
-          />
-          <div className="flex items-center justify-between">
-            {isSaving && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Saving notes...
+        <div className="space-y-4">
+          {/* Base Day Notes */}
+          {baseDayNotes && (
+            <div className="space-y-2">
+              <Label className="text-muted-foreground">Base Day Notes</Label>
+              <div className="p-3 bg-muted/30 rounded-lg border border-muted-foreground/20">
+                <div className="text-sm whitespace-pre-wrap">{baseDayNotes}</div>
               </div>
-            )}
-            {hasUnsavedNotes && !isSaving && (
-              <div className="text-sm text-muted-foreground">
-                You have unsaved changes
-              </div>
-            )}
-            <Button
-              onClick={handleSaveNotes}
-              disabled={!hasUnsavedNotes || isSaving || isLoading}
-              size="sm"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  Saving...
-                </>
-              ) : (
-                "Save Notes"
+            </div>
+          )}
+
+          {/* Compare Notes */}
+          <div className="space-y-2">
+            <Label>Compare Notes</Label>
+            <Textarea
+              placeholder="Add any notes about the changes or verification..."
+              value={notes}
+              onChange={(e) => handleNotesChange(e.target.value)}
+              className="min-h-[100px]"
+              disabled={isLoading}
+            />
+            <div className="flex items-center justify-between">
+              {isSaving && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Saving notes...
+                </div>
               )}
-            </Button>
+              {hasUnsavedNotes && !isSaving && (
+                <div className="text-sm text-muted-foreground">
+                  You have unsaved changes
+                </div>
+              )}
+              <Button
+                onClick={handleSaveNotes}
+                disabled={!hasUnsavedNotes || isSaving || isLoading}
+                size="sm"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Notes"
+                )}
+              </Button>
+            </div>
           </div>
         </div>
 

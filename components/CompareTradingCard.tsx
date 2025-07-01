@@ -4,7 +4,7 @@ import { DailyStats } from "@/lib/trading-log-parser";
 import { format, parseISO } from "date-fns";
 import { TrendingUp, TrendingDown, Target, DollarSign, Trophy, CheckCircle2, FileText, Clock } from "lucide-react";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CompareTradingDialog } from "./CompareTradingDialog";
 
 interface CompareTradingCardProps {
@@ -24,6 +24,27 @@ export function CompareTradingCard({ baseStats, compareStats, metadata, onMerge 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isVerified, setIsVerified] = useState(metadata?.verified || false);
   const [notes, setNotes] = useState<string>(metadata?.notes || "");
+  const [baseDayNotes, setBaseDayNotes] = useState<string>("");
+
+  // Fetch base day notes when component mounts
+  useEffect(() => {
+    const fetchBaseDayNotes = async () => {
+      try {
+        const formattedDate = format(baseStats.date, 'yyyy-MM-dd');
+        const response = await fetch(`/api/trading-data/notes?date=${formattedDate}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.data && data.data.notes) {
+            setBaseDayNotes(data.data.notes);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching base day notes:', error);
+      }
+    };
+
+    fetchBaseDayNotes();
+  }, [baseStats.date]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -202,13 +223,32 @@ export function CompareTradingCard({ baseStats, compareStats, metadata, onMerge 
                   </AccordionContent>
                 </AccordionItem>
 
-                {/* Notes accordion - only show if notes exist */}
+                {/* Base Day Notes accordion - only show if base day notes exist */}
+                {baseDayNotes && baseDayNotes.trim() && (
+                  <AccordionItem value="base-notes">
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex items-center gap-2 w-full">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium text-muted-foreground">Base Day Notes</span>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      <div className="pt-2 pb-2">
+                        <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 rounded-md p-3 border border-muted-foreground/20">
+                          {baseDayNotes}
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                )}
+
+                {/* Compare Notes accordion - only show if notes exist */}
                 {notes && notes.trim() && (
                   <AccordionItem value="notes">
                     <AccordionTrigger className="hover:no-underline">
                       <div className="flex items-center gap-2 w-full">
                         <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm font-medium">Notes</span>
+                        <span className="text-sm font-medium">Compare Notes</span>
                       </div>
                     </AccordionTrigger>
                     <AccordionContent>
