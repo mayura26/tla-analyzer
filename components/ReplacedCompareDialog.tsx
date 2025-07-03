@@ -237,7 +237,7 @@ export function ReplacedCompareDialog({
         oldSub.pnl !== newSub.pnl ||
         oldSub.points !== newSub.points ||
         oldSub.exitReason !== newSub.exitReason ||
-        oldSub.detailedExitReason !== newSub.detailedExitReason
+        (oldSub.detailedExitReason || '') !== (newSub.detailedExitReason || '')
       ) { hasDiff = true; break; }
     }
     if (!hasDiff) return null;
@@ -276,7 +276,7 @@ export function ReplacedCompareDialog({
                       </div>
                       {oldSub.detailedExitReason && (
                         <div>
-                          detailedReason: <span className={oldSub && newSub && oldSub.detailedExitReason !== newSub.detailedExitReason ? 'bg-yellow-900/40 px-1 rounded' : ''}>{oldSub.detailedExitReason}</span>
+                          detailedReason: <span className={oldSub && newSub && (oldSub.detailedExitReason || '') !== (newSub.detailedExitReason || '') ? 'bg-yellow-900/40 px-1 rounded' : ''}>{oldSub.detailedExitReason}</span>
                         </div>
                       )}
                     </>
@@ -302,7 +302,7 @@ export function ReplacedCompareDialog({
                       </div>
                       {newSub.detailedExitReason && (
                         <div>
-                          detailedReason: <span className={oldSub && newSub && oldSub.detailedExitReason !== newSub.detailedExitReason ? 'bg-yellow-900/40 px-1 rounded' : ''}>{newSub.detailedExitReason}</span>
+                          detailedReason: <span className={oldSub && newSub && (oldSub.detailedExitReason || '') !== (newSub.detailedExitReason || '') ? 'bg-yellow-900/40 px-1 rounded' : ''}>{newSub.detailedExitReason}</span>
                         </div>
                       )}
                     </>

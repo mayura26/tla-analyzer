@@ -327,7 +327,7 @@ export function parseTradingLog(logData: string): TradingLogAnalysis {
     }
 
     // Trade close (including partial exits)
-    const closeMatch = line.match(/\[TRADE CLOSE(?: - (TP|SL))? \(ID: (\d+)\)\] TRADE CLOSED:.*?\((.*?)\) at Price: ([\d.]+)/);
+    const closeMatch = line.match(/\[TRADE CLOSE(?: - (TP|SL))? \(ID: (\d+)\)\] TRADE CLOSED:.*?(?:\((.*?)\))? at Price: ([\d.]+)/);
     if (closeMatch && timestamp) {
       const id = parseInt(closeMatch[2]);
       const detailedReason = closeMatch[3] || '';

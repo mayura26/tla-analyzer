@@ -44,7 +44,25 @@ function getTradeChanges(baseTrade: TradeListEntry, compareTrade: TradeListEntry
     if (k === 'subTrades') {
       const baseSubTrades = baseTrade.subTrades || [];
       const compareSubTrades = compareTrade.subTrades || [];
-      if (JSON.stringify(baseSubTrades) !== JSON.stringify(compareSubTrades)) {
+      
+      // Custom comparison for subTrades that ignores detailedExitReason when it's undefined/empty
+      const normalizedBaseSubTrades = baseSubTrades.map(subTrade => {
+        const normalized = { ...subTrade };
+        if (!normalized.detailedExitReason || normalized.detailedExitReason.trim() === '') {
+          delete normalized.detailedExitReason;
+        }
+        return normalized;
+      });
+      
+      const normalizedCompareSubTrades = compareSubTrades.map(subTrade => {
+        const normalized = { ...subTrade };
+        if (!normalized.detailedExitReason || normalized.detailedExitReason.trim() === '') {
+          delete normalized.detailedExitReason;
+        }
+        return normalized;
+      });
+      
+      if (JSON.stringify(normalizedBaseSubTrades) !== JSON.stringify(normalizedCompareSubTrades)) {
         changes.push({
           field: k,
           oldValue: baseSubTrades,
@@ -62,10 +80,28 @@ function getTradeChanges(baseTrade: TradeListEntry, compareTrade: TradeListEntry
   return changes;
 }
 
+function printTradeKeys(trades: TradeListEntry[], label: string) {
+  console.log(`--- ${label} ---`);
+  for (const trade of trades) {
+    const key = `${new Date(trade.timestamp).toISOString()}|${trade.direction}|${Number(trade.entryPrice).toFixed(2)}|${trade.quantity}`;
+    console.log(key, {
+      timestamp: trade.timestamp,
+      direction: trade.direction,
+      entryPrice: trade.entryPrice,
+      quantity: trade.quantity,
+      id: trade.id,
+      subTrades: trade.subTrades,
+    });
+  }
+}
+
 export function compareTradingLogs(
   baseData: { trades: TradeListEntry[]; dailyStats: DailyStats },
   compareData: { trades: TradeListEntry[]; dailyStats: DailyStats }
 ): ComparisonResult {
+  printTradeKeys(baseData.trades, 'BASE');
+  printTradeKeys(compareData.trades, 'COMPARE');
+
   const result: ComparisonResult = {
     base: baseData,
     compare: compareData,
