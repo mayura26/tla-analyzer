@@ -381,17 +381,41 @@ export function ReplacedCompareDialog({
               <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
             </div>
             <div className="flex items-center gap-2">
-              <Badge 
-                variant="outline" 
-                className={`${
-                  trade.totalPnl >= 0 
-                    ? 'bg-green-400/20 text-green-400 border-green-400/30' 
-                    : 'bg-red-400/20 text-red-400 border-red-400/30'
-                }`}
-              >
-                {formatCurrency(trade.totalPnl)}
-              </Badge>
-              <Badge variant="outline" className="text-xs">{trade.entryPrice}</Badge>
+              {isModified && pnlChange ? (
+                <div className="flex items-center gap-1">
+                  <Badge 
+                    variant="outline" 
+                    className={`${
+                      pnlChange.newValue - pnlChange.oldValue >= 0 
+                        ? 'bg-green-400/20 text-green-400 border-green-400/30' 
+                        : 'bg-red-400/20 text-red-400 border-red-400/30'
+                    }`}
+                  >
+                    Δ {formatCurrency(pnlChange.newValue - pnlChange.oldValue)}
+                  </Badge>
+                  <Badge 
+                    variant="outline" 
+                    className={`${
+                      trade.totalPnl >= 0 
+                        ? 'bg-green-400/20 text-green-400 border-green-400/30' 
+                        : 'bg-red-400/20 text-red-400 border-red-400/30'
+                    }`}
+                  >
+                    ∑ {formatCurrency(trade.totalPnl)}
+                  </Badge>
+                </div>
+              ) : (
+                <Badge 
+                  variant="outline" 
+                  className={`${
+                    trade.totalPnl >= 0 
+                      ? 'bg-green-400/20 text-green-400 border-green-400/30' 
+                      : 'bg-red-400/20 text-red-400 border-red-400/30'
+                  }`}
+                >
+                  ∑ {formatCurrency(trade.totalPnl)}
+                </Badge>
+              )}
             </div>
           </div>
         </div>
@@ -679,8 +703,8 @@ export function ReplacedCompareDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-3">
             <span>Replaced vs Current Comparison</span>
             <Button
@@ -700,8 +724,9 @@ export function ReplacedCompareDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {/* Header bar for date and PnL comparison */}
-        <div className="bg-muted/80 rounded-lg px-6 py-4 mb-4 border border-muted-foreground/10 shadow-sm">
+        {/* Sticky header bar for date and PnL comparison */}
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-muted-foreground/10 -mx-6 px-6 py-4 mb-4">
+          <div className="bg-muted/80 rounded-lg px-6 py-4 border border-muted-foreground/10 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               <span className="font-semibold text-lg">
@@ -756,10 +781,13 @@ export function ReplacedCompareDialog({
               </div>
             </div>
           )}
+          </div>
         </div>
 
-        {/* Notes Section */}
-        <div className="space-y-4">
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {/* Notes Section */}
+          <div className="space-y-4">
           <div className="text-lg font-semibold">Notes</div>
           
           {/* Loading state for notes */}
@@ -861,13 +889,14 @@ export function ReplacedCompareDialog({
           </div>
         )}
 
-        {/* Trade Comparison */}
-        {!loadingCurrentData && (
-          <div className="space-y-4">
-            <div className="text-lg font-semibold">Trade Differences</div>
-            {renderTradeComparison()}
-          </div>
-        )}
+          {/* Trade Comparison */}
+          {!loadingCurrentData && (
+            <div className="space-y-4">
+              <div className="text-lg font-semibold">Trade Differences</div>
+              {renderTradeComparison()}
+            </div>
+          )}
+        </div>
       </DialogContent>
     </Dialog>
   );

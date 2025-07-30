@@ -532,17 +532,41 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
               <CheckCircle2 className="w-4 h-4 text-muted-foreground" />
             </div>
             <div className="flex items-center gap-2">
-              <Badge 
-                variant="outline" 
-                className={`${
-                  trade.totalPnl >= 0 
-                    ? 'bg-green-400/20 text-green-400 border-green-400/30' 
-                    : 'bg-red-400/20 text-red-400 border-red-400/30'
-                }`}
-              >
-                {formatCurrency(trade.totalPnl)}
-              </Badge>
-              <Badge variant="outline" className="text-xs">{trade.entryPrice}</Badge>
+              {isModified && pnlChange ? (
+                <div className="flex items-center gap-1">
+                  <Badge 
+                    variant="outline" 
+                    className={`${
+                      pnlChange.newValue - pnlChange.oldValue >= 0 
+                        ? 'bg-green-400/20 text-green-400 border-green-400/30' 
+                        : 'bg-red-400/20 text-red-400 border-red-400/30'
+                    }`}
+                  >
+                    Δ {formatCurrency(pnlChange.newValue - pnlChange.oldValue)}
+                  </Badge>
+                  <Badge 
+                    variant="outline" 
+                    className={`${
+                      trade.totalPnl >= 0 
+                        ? 'bg-green-400/20 text-green-400 border-green-400/30' 
+                        : 'bg-red-400/20 text-red-400 border-red-400/30'
+                    }`}
+                  >
+                    ∑ {formatCurrency(trade.totalPnl)}
+                  </Badge>
+                </div>
+              ) : (
+                <Badge 
+                  variant="outline" 
+                  className={`${
+                    trade.totalPnl >= 0 
+                      ? 'bg-green-400/20 text-green-400 border-green-400/30' 
+                      : 'bg-red-400/20 text-red-400 border-red-400/30'
+                  }`}
+                >
+                  ∑ {formatCurrency(trade.totalPnl)}
+                </Badge>
+              )}
             </div>
           </div>
         </div>
