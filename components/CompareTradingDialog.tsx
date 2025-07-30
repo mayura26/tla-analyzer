@@ -366,6 +366,14 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
     return value >= 0 ? 'text-green-500' : 'text-red-500';
   };
 
+  // Format time without timezone conversion - display exactly as in file
+  const formatTime = (dateInput: Date | string) => {
+    // Convert string to Date if needed
+    const date = typeof dateInput === 'string' ? parseISO(dateInput) : dateInput;
+    // Format the time directly without any timezone compensation
+    return formatInTimeZone(date, 'UTC', 'HH:mm');
+  };
+
   const renderSubTradeComparison = (oldSubTrades: TradeListEntry['subTrades'][number][], newSubTrades: TradeListEntry['subTrades'][number][]) => {
     const maxLen = Math.max(oldSubTrades.length, newSubTrades.length);
     if (maxLen === 0) return null;
@@ -381,7 +389,8 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
         oldSub.pnl !== newSub.pnl ||
         oldSub.points !== newSub.points ||
         oldSub.exitReason !== newSub.exitReason ||
-        (oldSub.detailedExitReason || '') !== (newSub.detailedExitReason || '')
+        (oldSub.detailedExitReason || '') !== (newSub.detailedExitReason || '') ||
+        JSON.stringify(oldSub.exitTimestamp) !== JSON.stringify(newSub.exitTimestamp)
       ) { hasDiff = true; break; }
     }
     if (!hasDiff) return null;
@@ -417,6 +426,9 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
                       <div>
                         exitReason: <span className={oldSub && newSub && oldSub.exitReason !== newSub.exitReason ? 'bg-yellow-900/40 px-1 rounded' : ''}>{oldSub.exitReason}</span>
                       </div>
+                      <div>
+                        exitTime: <span className={oldSub && newSub && JSON.stringify(oldSub.exitTimestamp) !== JSON.stringify(newSub.exitTimestamp) ? 'bg-yellow-900/40 px-1 rounded' : ''}>{formatTime(oldSub.exitTimestamp)}</span>
+                      </div>
                       {oldSub.detailedExitReason && (
                         <div>
                           detailedReason: <span className={oldSub && newSub && (oldSub.detailedExitReason || '') !== (newSub.detailedExitReason || '') ? 'bg-yellow-900/40 px-1 rounded' : ''}>{oldSub.detailedExitReason}</span>
@@ -443,6 +455,9 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
                       <div>
                         exitReason: <span className={oldSub && newSub && oldSub.exitReason !== newSub.exitReason ? 'bg-yellow-900/40 px-1 rounded' : ''}>{newSub.exitReason}</span>
                       </div>
+                      <div>
+                        exitTime: <span className={oldSub && newSub && JSON.stringify(oldSub.exitTimestamp) !== JSON.stringify(newSub.exitTimestamp) ? 'bg-yellow-900/40 px-1 rounded' : ''}>{formatTime(newSub.exitTimestamp)}</span>
+                      </div>
                       {newSub.detailedExitReason && (
                         <div>
                           detailedReason: <span className={oldSub && newSub && (oldSub.detailedExitReason || '') !== (newSub.detailedExitReason || '') ? 'bg-yellow-900/40 px-1 rounded' : ''}>{newSub.detailedExitReason}</span>
@@ -460,13 +475,6 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
   };
 
   const renderTrade = (trade: TradeListEntry, isModified = false, changes: { field: keyof TradeListEntry; oldValue: any; newValue: any }[] = []) => {
-    // Format time without timezone conversion - display exactly as in file
-    const formatTime = (dateInput: Date | string) => {
-      // Convert string to Date if needed
-      const date = typeof dateInput === 'string' ? parseISO(dateInput) : dateInput;
-      // Format the time directly without any timezone compensation
-      return formatInTimeZone(date, 'UTC', 'HH:mm');
-    };
 
     // Find subTrades change and get detailed diffs if present
     let subTradeComparison: React.ReactNode = null;
@@ -630,6 +638,7 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
                       {subTrade.exitReason}
                     </Badge>
                     <span>{subTrade.quantity} @ {subTrade.exitPrice}</span>
+                    <span className="text-muted-foreground">{formatTime(subTrade.exitTimestamp)}</span>
                   </div>
                   <span className={`${getPnlColor(subTrade.pnl)}`}>{formatCurrency(subTrade.pnl)}</span>
                 </div>
