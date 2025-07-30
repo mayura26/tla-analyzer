@@ -9,6 +9,49 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { X, Eye } from "lucide-react";
 import { ReplacedCompareDialog } from "@/components/ReplacedCompareDialog";
+import { CompareTradingDialog } from "@/components/CompareTradingDialog";
+import { DailyStats, TradeListEntry } from "@/lib/trading-log-parser";
+
+// Transform TradingLogAnalysis to DailyStats format for the compare dialog
+const transformToDailyStats = (analysis: any, dateStr: string): DailyStats & { tradeList?: TradeListEntry[] } => {
+  if (!analysis) throw new Error('Analysis data is required');
+  
+  // Parse date - expect YYYY-MM-DD format from API
+  const dateParts = dateStr.split('-');
+  const localDate = new Date(
+    Number(dateParts[0]),
+    Number(dateParts[1]) - 1,
+    Number(dateParts[2])
+  );
+  
+  return {
+    date: localDate,
+    totalTrades: analysis.headline.totalTrades,
+    wins: analysis.headline.wins,
+    losses: analysis.headline.losses,
+    totalPnl: analysis.headline.totalPnl,
+    totalPoints: analysis.headline.trailingDrawdown || 0,
+    trailingDrawdown: analysis.headline.trailingDrawdown || 0,
+    contracts: analysis.headline.contracts || 0,
+    bigWins: analysis.headline.bigWins || 0,
+    bigLosses: analysis.headline.bigLosses || 0,
+    maxPotentialGainPerContract: analysis.headline.maxPotentialGainPerContract || 0,
+    pnlPerTrade: analysis.headline.pnlPerTrade || 0,
+    maxProfit: analysis.headline.maxProfit || 0,
+    maxRisk: analysis.headline.maxRisk || 0,
+    maxDailyGain: analysis.headline.maxDailyGain || 0,
+    maxDailyLoss: analysis.headline.maxDailyLoss || 0,
+    sessionBreakdown: {
+      morning: analysis.sessions?.morning || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
+      main: analysis.sessions?.main || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
+      midday: analysis.sessions?.midday || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
+      afternoon: analysis.sessions?.afternoon || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
+      end: analysis.sessions?.end || { pnl: 0, trades: 0, avgPnlPerTrade: 0 },
+    },
+    protectionStats: analysis.protectionStats,
+    tradeList: analysis.tradeList || [],
+  };
+};
 
 interface SubmissionLog {
   id: string;
@@ -34,6 +77,12 @@ export default function ComparePage() {
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [replacedCompareDialogOpen, setReplacedCompareDialogOpen] = useState(false);
   const [selectedReplacedData, setSelectedReplacedData] = useState<any>(null);
+  const [compareDialogOpen, setCompareDialogOpen] = useState(false);
+  const [compareDialogData, setCompareDialogData] = useState<{
+    baseStats: DailyStats & { tradeList?: TradeListEntry[] };
+    compareStats: DailyStats & { tradeList?: TradeListEntry[] };
+  } | null>(null);
+  const [loadingDialogData, setLoadingDialogData] = useState(false);
 
   // Function to get PnL color based on value (same logic as trading card)
   const getPnlColor = (value: number) => {
@@ -222,6 +271,62 @@ export default function ComparePage() {
     }
   };
 
+  // Function to handle PnL diff click and open compare dialog
+  const handlePnlDiffClick = async (submission: SubmissionLog) => {
+    if (!submission.dataDate) {
+      toast.error("No date available for comparison");
+      return;
+    }
+
+    setLoadingDialogData(true);
+    try {
+      // Convert date format for API call (MM/DD/YYYY to YYYY-MM-DD)
+      const dateParts = submission.dataDate.split('/');
+      if (dateParts.length !== 3) {
+        throw new Error('Invalid date format');
+      }
+      const apiDate = `${dateParts[2]}-${dateParts[0].padStart(2, '0')}-${dateParts[1].padStart(2, '0')}`;
+      
+      // Fetch both base and compare data in parallel
+      const [baseResponse, compareResponse] = await Promise.all([
+        fetch(`/api/trading-data/base?date=${apiDate}`),
+        fetch(`/api/trading-data/compare/manage?date=${apiDate}`)
+      ]);
+
+      if (!baseResponse.ok) {
+        throw new Error('Failed to fetch base data');
+      }
+      if (!compareResponse.ok) {
+        throw new Error('Failed to fetch compare data');
+      }
+
+      const baseData = await baseResponse.json();
+      const compareData = await compareResponse.json();
+
+      // Transform the data to DailyStats format expected by the dialog
+      const transformedBaseStats = transformToDailyStats(baseData.analysis, apiDate);
+      const transformedCompareStats = transformToDailyStats(compareData.analysis, apiDate);
+
+      // Set the dialog data and open the dialog
+      setCompareDialogData({
+        baseStats: transformedBaseStats,
+        compareStats: transformedCompareStats
+      });
+      setCompareDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching comparison data:', error);
+      toast.error("Failed to load comparison data");
+    } finally {
+      setLoadingDialogData(false);
+    }
+  };
+
+  // Function to handle compare dialog close
+  const handleCompareDialogClose = () => {
+    setCompareDialogOpen(false);
+    setCompareDialogData(null);
+  };
+
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
@@ -387,8 +492,13 @@ export default function ComparePage() {
                           {log.pnlDifference !== undefined && (
                             <>
                               <span className="text-muted-foreground">•</span>
-                              <Badge variant="secondary" className={`text-xs font-bold ${getDifferenceBadgeClass(log.pnlDifference)}`}>
-                                Diff: {log.pnlDifference >= 0 ? '+' : '-'}${Math.abs(log.pnlDifference).toFixed(2)}
+                              <Badge 
+                                variant="secondary" 
+                                className={`text-xs font-bold cursor-pointer hover:opacity-80 transition-opacity ${getDifferenceBadgeClass(log.pnlDifference)} ${loadingDialogData ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                onClick={() => !loadingDialogData && handlePnlDiffClick(log)}
+                                title={loadingDialogData ? "Loading comparison data..." : "Click to view detailed comparison"}
+                              >
+                                {loadingDialogData ? "Loading..." : `Diff: ${log.pnlDifference >= 0 ? '+' : '-'}$${Math.abs(log.pnlDifference).toFixed(2)}`}
                               </Badge>
                             </>
                           )}
@@ -455,6 +565,16 @@ export default function ComparePage() {
         replacedData={selectedReplacedData}
         onDelete={handleReplacedDataDeleted}
       />
+
+      {/* Compare Trading Dialog */}
+      {compareDialogData && (
+        <CompareTradingDialog
+          isOpen={compareDialogOpen}
+          onClose={handleCompareDialogClose}
+          baseStats={compareDialogData.baseStats}
+          compareStats={compareDialogData.compareStats}
+        />
+      )}
     </div>
   );
 }
