@@ -221,6 +221,11 @@ export function ReplacedCompareDialog({
     return value >= 0 ? 'text-green-500' : 'text-red-500';
   };
 
+  const formatTime = (dateInput: Date | string) => {
+    const date = typeof dateInput === 'string' ? parseISO(dateInput) : dateInput;
+    return formatInTimeZone(date, 'UTC', 'HH:mm');
+  };
+
   const renderSubTradeComparison = (oldSubTrades: TradeListEntry['subTrades'][number][], newSubTrades: TradeListEntry['subTrades'][number][]) => {
     const maxLen = Math.max(oldSubTrades.length, newSubTrades.length);
     if (maxLen === 0) return null;
@@ -237,15 +242,50 @@ export function ReplacedCompareDialog({
         oldSub.pnl !== newSub.pnl ||
         oldSub.points !== newSub.points ||
         oldSub.exitReason !== newSub.exitReason ||
-        (oldSub.detailedExitReason || '') !== (newSub.detailedExitReason || '')
+        (oldSub.detailedExitReason || '') !== (newSub.detailedExitReason || '') ||
+        JSON.stringify(oldSub.exitTimestamp) !== JSON.stringify(newSub.exitTimestamp)
       ) { hasDiff = true; break; }
     }
     if (!hasDiff) return null;
+
+    // Helper function to get differences for a sub-trade pair
+    const getSubTradeDifferences = (oldSub: any, newSub: any) => {
+      const differences = [];
+      
+      if (!oldSub || !newSub) {
+        // If one is missing, show a special message
+        return [{ field: 'existence', isDifferent: true, label: 'Trade exists', oldValue: oldSub ? 'Yes' : 'No', newValue: newSub ? 'Yes' : 'No' }];
+      }
+      
+      if (oldSub.exitPrice !== newSub.exitPrice) {
+        differences.push({ field: 'exitPrice', isDifferent: true, label: 'exitPrice', oldValue: oldSub.exitPrice, newValue: newSub.exitPrice });
+      }
+      if (oldSub.quantity !== newSub.quantity) {
+        differences.push({ field: 'quantity', isDifferent: true, label: 'quantity', oldValue: oldSub.quantity, newValue: newSub.quantity });
+      }
+      if (oldSub.pnl !== newSub.pnl) {
+        differences.push({ field: 'pnl', isDifferent: true, label: 'pnl', oldValue: formatCurrency(oldSub.pnl), newValue: formatCurrency(newSub.pnl) });
+      }
+      if (oldSub.points !== newSub.points) {
+        differences.push({ field: 'points', isDifferent: true, label: 'points', oldValue: oldSub.points, newValue: newSub.points });
+      }
+      if (oldSub.exitReason !== newSub.exitReason) {
+        differences.push({ field: 'exitReason', isDifferent: true, label: 'exitReason', oldValue: oldSub.exitReason, newValue: newSub.exitReason });
+      }
+      if (JSON.stringify(oldSub.exitTimestamp) !== JSON.stringify(newSub.exitTimestamp)) {
+        differences.push({ field: 'exitTime', isDifferent: true, label: 'exitTime', oldValue: formatTime(oldSub.exitTimestamp), newValue: formatTime(newSub.exitTimestamp) });
+      }
+      if ((oldSub.detailedExitReason || '') !== (newSub.detailedExitReason || '')) {
+        differences.push({ field: 'detailedReason', isDifferent: true, label: 'detailedReason', oldValue: oldSub.detailedExitReason || '', newValue: newSub.detailedExitReason || '' });
+      }
+      
+      return differences;
+    };
     
-    // Render side-by-side comparison
+    // Render side-by-side comparison with only different fields
     return (
       <div className="col-span-2 mt-2">
-        <div className="text-xs font-medium mb-1">Sub-trade Comparison</div>
+        <div className="text-xs font-medium mb-1">Sub-trade Comparison (Differences Only)</div>
         <div className="grid grid-cols-3 gap-2 text-xs">
           <div className="font-semibold text-muted-foreground">#</div>
           <div className="font-semibold text-muted-foreground">Replaced</div>
@@ -253,60 +293,33 @@ export function ReplacedCompareDialog({
           {Array.from({ length: maxLen }).map((_, i) => {
             const oldSub = oldSubTrades[i];
             const newSub = newSubTrades[i];
+            const differences = getSubTradeDifferences(oldSub, newSub);
+            
+            if (differences.length === 0) {
+              return (
+                <React.Fragment key={i}>
+                  <div className="text-muted-foreground">{`Exit ${i + 1}`}</div>
+                  <div className="col-span-2 text-center text-muted-foreground italic">No differences</div>
+                </React.Fragment>
+              );
+            }
+            
             return (
               <React.Fragment key={i}>
                 <div className="text-muted-foreground">{`Exit ${i + 1}`}</div>
                 <div className="space-y-0.5">
-                  {oldSub ? (
-                    <>
-                      <div>
-                        exitPrice: <span className={oldSub && newSub && oldSub.exitPrice !== newSub.exitPrice ? 'bg-yellow-900/40 px-1 rounded' : ''}>{oldSub.exitPrice}</span>
-                      </div>
-                      <div>
-                        quantity: <span className={oldSub && newSub && oldSub.quantity !== newSub.quantity ? 'bg-yellow-900/40 px-1 rounded' : ''}>{oldSub.quantity}</span>
-                      </div>
-                      <div>
-                        pnl: <span className={oldSub && newSub && oldSub.pnl !== newSub.pnl ? 'bg-yellow-900/40 px-1 rounded' : ''}>{formatCurrency(oldSub.pnl)}</span>
-                      </div>
-                      <div>
-                        points: <span className={oldSub && newSub && oldSub.points !== newSub.points ? 'bg-yellow-900/40 px-1 rounded' : ''}>{oldSub.points}</span>
-                      </div>
-                      <div>
-                        exitReason: <span className={oldSub && newSub && oldSub.exitReason !== newSub.exitReason ? 'bg-yellow-900/40 px-1 rounded' : ''}>{oldSub.exitReason}</span>
-                      </div>
-                      {oldSub.detailedExitReason && (
-                        <div>
-                          detailedReason: <span className={oldSub && newSub && (oldSub.detailedExitReason || '') !== (newSub.detailedExitReason || '') ? 'bg-yellow-900/40 px-1 rounded' : ''}>{oldSub.detailedExitReason}</span>
-                        </div>
-                      )}
-                    </>
-                  ) : <span className="italic text-muted-foreground">—</span>}
+                  {differences.map((diff) => (
+                    <div key={diff.field}>
+                      {diff.label}: <span className="bg-yellow-900/40 px-1 rounded">{diff.oldValue || '—'}</span>
+                    </div>
+                  ))}
                 </div>
                 <div className="space-y-0.5">
-                  {newSub ? (
-                    <>
-                      <div>
-                        exitPrice: <span className={oldSub && newSub && oldSub.exitPrice !== newSub.exitPrice ? 'bg-yellow-900/40 px-1 rounded' : ''}>{newSub.exitPrice}</span>
-                      </div>
-                      <div>
-                        quantity: <span className={oldSub && newSub && oldSub.quantity !== newSub.quantity ? 'bg-yellow-900/40 px-1 rounded' : ''}>{newSub.quantity}</span>
-                      </div>
-                      <div>
-                        pnl: <span className={oldSub && newSub && oldSub.pnl !== newSub.pnl ? 'bg-yellow-900/40 px-1 rounded' : ''}>{formatCurrency(newSub.pnl)}</span>
-                      </div>
-                      <div>
-                        points: <span className={oldSub && newSub && oldSub.points !== newSub.points ? 'bg-yellow-900/40 px-1 rounded' : ''}>{newSub.points}</span>
-                      </div>
-                      <div>
-                        exitReason: <span className={oldSub && newSub && oldSub.exitReason !== newSub.exitReason ? 'bg-yellow-900/40 px-1 rounded' : ''}>{newSub.exitReason}</span>
-                      </div>
-                      {newSub.detailedExitReason && (
-                        <div>
-                          detailedReason: <span className={oldSub && newSub && (oldSub.detailedExitReason || '') !== (newSub.detailedExitReason || '') ? 'bg-yellow-900/40 px-1 rounded' : ''}>{newSub.detailedExitReason}</span>
-                        </div>
-                      )}
-                    </>
-                  ) : <span className="italic text-muted-foreground">—</span>}
+                  {differences.map((diff) => (
+                    <div key={diff.field}>
+                      {diff.label}: <span className="bg-yellow-900/40 px-1 rounded">{diff.newValue || '—'}</span>
+                    </div>
+                  ))}
                 </div>
               </React.Fragment>
             );
@@ -317,10 +330,6 @@ export function ReplacedCompareDialog({
   };
 
   const renderTrade = (trade: TradeListEntry, isModified = false, changes: { field: keyof TradeListEntry; oldValue: any; newValue: any }[] = []) => {
-    const formatTime = (dateInput: Date | string) => {
-      const date = typeof dateInput === 'string' ? parseISO(dateInput) : dateInput;
-      return formatInTimeZone(date, 'UTC', 'HH:mm');
-    };
 
     // Find subTrades change and get detailed diffs if present
     let subTradeComparison: React.ReactNode = null;
