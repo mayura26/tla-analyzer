@@ -989,85 +989,92 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Detailed Comparison</DialogTitle>
         </DialogHeader>
-        {/* Styled header bar for date and PnL diff */}
-        <div className="bg-muted/80 rounded-lg px-6 py-4 mb-4 border border-muted-foreground/10 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <span className="font-semibold text-lg">
-                {baseStats.date ? (() => {
-                  // Format date without timezone conversion
-                  const date = typeof baseStats.date === 'string' 
-                    ? parseISO(baseStats.date) 
-                    : baseStats.date;
-                  return format(date, 'MMM dd, yyyy (EEE)');
-                })() : ''}
+        
+        {/* Sticky header bar for date and PnL diff */}
+        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-muted-foreground/10 -mx-6 px-6 py-4 mb-4">
+          <div className="bg-muted/80 rounded-lg px-6 py-4 border border-muted-foreground/10 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <span className="font-semibold text-lg">
+                  {baseStats.date ? (() => {
+                    // Format date without timezone conversion
+                    const date = typeof baseStats.date === 'string' 
+                      ? parseISO(baseStats.date) 
+                      : baseStats.date;
+                    return format(date, 'MMM dd, yyyy (EEE)');
+                  })() : ''}
+                </span>
+                {isVerified && (
+                  <div className="flex items-center gap-1 text-green-600">
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span className="text-sm font-medium">Verified</span>
+                  </div>
+                )}
+              </div>
+              <span className={`font-bold text-lg ${getPnlColor(compareStats.totalPnl - baseStats.totalPnl)}`}> 
+                {formatCurrency(compareStats.totalPnl - baseStats.totalPnl)}
               </span>
-              {isVerified && (
-                <div className="flex items-center gap-1 text-green-600">
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span className="text-sm font-medium">Verified</span>
-                </div>
-              )}
-            </div>
-            <span className={`font-bold text-lg ${getPnlColor(compareStats.totalPnl - baseStats.totalPnl)}`}> 
-              {formatCurrency(compareStats.totalPnl - baseStats.totalPnl)}
-            </span>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            {/* PnL Card */}
-            <div className="bg-background/50 rounded-lg p-3 border border-muted-foreground/20">
-              <div className="text-sm text-muted-foreground mb-1">PnL</div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Old</span>
-                <span>New</span>
-              </div>
-              <div className="flex items-center justify-between mt-1 text-lg">
-                <span className={`font-semibold ${getPnlColor(baseStats.totalPnl)}`}>
-                  {formatCurrency(baseStats.totalPnl)}
-                </span>
-                <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                <span className={`font-semibold ${getPnlColor(compareStats.totalPnl)}`}>
-                  {formatCurrency(compareStats.totalPnl)}
-                </span>
-              </div>
             </div>
             
-            {/* Win/Loss Card */}
-            <div className="bg-background/50 rounded-lg p-3 border border-muted-foreground/20">
-              <div className="text-sm text-muted-foreground mb-1">Win/Loss Record</div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Old</span>
-                <span>New</span>
+            <div className="grid grid-cols-2 gap-4">
+              {/* PnL Card */}
+              <div className="bg-background/50 rounded-lg p-3 border border-muted-foreground/20">
+                <div className="text-sm text-muted-foreground mb-1">PnL</div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Old</span>
+                  <span>New</span>
+                </div>
+                <div className="flex items-center justify-between mt-1 text-lg">
+                  <span className={`font-semibold ${getPnlColor(baseStats.totalPnl)}`}>
+                    {formatCurrency(baseStats.totalPnl)}
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                  <span className={`font-semibold ${getPnlColor(compareStats.totalPnl)}`}>
+                    {formatCurrency(compareStats.totalPnl)}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center justify-between mt-1 text-lg font-semibold">
-                <span>{baseStats.wins}-{baseStats.losses}</span>
-                <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                <span>{compareStats.wins}-{compareStats.losses}</span>
+              
+              {/* Win/Loss Card */}
+              <div className="bg-background/50 rounded-lg p-3 border border-muted-foreground/20">
+                <div className="text-sm text-muted-foreground mb-1">Win/Loss Record</div>
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Old</span>
+                  <span>New</span>
+                </div>
+                <div className="flex items-center justify-between mt-1 text-lg font-semibold">
+                  <span>{baseStats.wins}-{baseStats.losses}</span>
+                  <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                  <span>{compareStats.wins}-{compareStats.losses}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-        <Tabs defaultValue="sessions">
-          <TabsList>
-            <TabsTrigger value="sessions">Sessions</TabsTrigger>
-            <TabsTrigger value="trades">Trades</TabsTrigger>
-            <TabsTrigger value="manage">Manage</TabsTrigger>
-          </TabsList>
-          <TabsContent value="sessions" className="mt-4">
-            {renderSessionComparison()}
-          </TabsContent>
-          <TabsContent value="trades" className="mt-4">
-            {renderTradeComparison()}
-          </TabsContent>
-          <TabsContent value="manage" className="mt-4">
-            {renderManageTab()}
-          </TabsContent>
-        </Tabs>
+
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <Tabs defaultValue="sessions">
+            <TabsList className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm w-full">
+              <TabsTrigger value="sessions">Sessions</TabsTrigger>
+              <TabsTrigger value="trades">Trades</TabsTrigger>
+              <TabsTrigger value="manage">Manage</TabsTrigger>
+            </TabsList>
+            <TabsContent value="sessions" className="mt-4">
+              {renderSessionComparison()}
+            </TabsContent>
+            <TabsContent value="trades" className="mt-4">
+              {renderTradeComparison()}
+            </TabsContent>
+            <TabsContent value="manage" className="mt-4">
+              {renderManageTab()}
+            </TabsContent>
+          </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   );
