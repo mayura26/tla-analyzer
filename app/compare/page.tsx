@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { X, Eye } from "lucide-react";
+import { X, Eye, Clipboard } from "lucide-react";
 import { ReplacedCompareDialog } from "@/components/ReplacedCompareDialog";
 import { CompareTradingDialog } from "@/components/CompareTradingDialog";
 import { DailyStats, TradeListEntry } from "@/lib/trading-log-parser";
@@ -137,6 +137,22 @@ export default function ComparePage() {
       }
     }
     return undefined;
+  };
+
+  // Function to paste data from clipboard
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text.trim()) {
+        setLogData(text);
+        toast.success("Data pasted from clipboard");
+      } else {
+        toast.error("Clipboard is empty");
+      }
+    } catch (error) {
+      console.error('Error reading clipboard:', error);
+      toast.error("Failed to read clipboard. Please paste manually.");
+    }
   };
 
   // Function to fetch base data for a specific date
@@ -430,8 +446,18 @@ export default function ComparePage() {
   return (
     <div className="container mx-auto p-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="relative">
           <CardTitle>Trading Log Comparison</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePaste}
+            className="absolute top-0 right-6"
+            title="Paste from clipboard"
+          >
+            <Clipboard className="h-4 w-4 mr-2" />
+            Paste
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
