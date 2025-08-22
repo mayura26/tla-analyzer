@@ -69,12 +69,19 @@ interface TradingData {
   };
 }
 
+export interface TagAssignment {
+  tagId: string;
+  impact: 'positive' | 'negative';
+  assignedAt: string;
+}
+
 export interface DailyLog {
   date: string;
   analysis: TradingLogAnalysis;
   metadata?: {
     verified?: boolean;
-    notes?: string;
+    notes?: string; // Keep for backward compatibility during transition
+    tagAssignments?: TagAssignment[];
     verifiedAt?: string;
     verifiedBy?: string;
     addedAt?: string;
@@ -729,6 +736,87 @@ class TradingDataStore {
       metadata: {
         ...compareData[dayIndex].metadata,
         notes
+      }
+    };
+
+    compareData[dayIndex] = updatedDay;
+    await this.saveToStorage('compare');
+    return updatedDay;
+  }
+
+  async assignCompareTag(date: string, tagId: string, impact: 'positive' | 'negative'): Promise<DailyLog | null> {
+    await this.loadFromStorage('compare');
+    const compareData = this.endpoints.compare.data;
+    const dayIndex = compareData.findIndex(d => d.date === date);
+
+    if (dayIndex === -1) {
+      return null;
+    }
+
+    const existingTagAssignments = compareData[dayIndex].metadata?.tagAssignments || [];
+    
+    // Remove existing assignment for this tag if it exists
+    const filteredAssignments = existingTagAssignments.filter(assignment => assignment.tagId !== tagId);
+    
+    // Add new assignment
+    const newAssignment: TagAssignment = {
+      tagId,
+      impact,
+      assignedAt: new Date().toISOString()
+    };
+
+    const updatedDay = {
+      ...compareData[dayIndex],
+      metadata: {
+        ...compareData[dayIndex].metadata,
+        tagAssignments: [...filteredAssignments, newAssignment]
+      }
+    };
+
+    compareData[dayIndex] = updatedDay;
+    await this.saveToStorage('compare');
+    return updatedDay;
+  }
+
+  async removeCompareTag(date: string, tagId: string): Promise<DailyLog | null> {
+    await this.loadFromStorage('compare');
+    const compareData = this.endpoints.compare.data;
+    const dayIndex = compareData.findIndex(d => d.date === date);
+
+    if (dayIndex === -1) {
+      return null;
+    }
+
+    const existingTagAssignments = compareData[dayIndex].metadata?.tagAssignments || [];
+    const filteredAssignments = existingTagAssignments.filter(assignment => assignment.tagId !== tagId);
+
+    const updatedDay = {
+      ...compareData[dayIndex],
+      metadata: {
+        ...compareData[dayIndex].metadata,
+        tagAssignments: filteredAssignments
+      }
+    };
+
+    compareData[dayIndex] = updatedDay;
+    await this.saveToStorage('compare');
+    return updatedDay;
+  }
+
+  async updateCompareTagAssignments(date: string, tagAssignments: TagAssignment[]): Promise<DailyLog | null> {
+    await this.loadFromStorage('compare');
+    const compareData = this.endpoints.compare.data;
+    const dayIndex = compareData.findIndex(d => d.date === date);
+
+    if (dayIndex === -1) {
+      return null;
+    }
+
+    const updatedDay = {
+      ...compareData[dayIndex],
+      metadata: {
+        ...compareData[dayIndex].metadata,
+        tagAssignments
       }
     };
 

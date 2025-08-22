@@ -8,14 +8,26 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, ChevronDown, ChevronUp, DollarSign, Target, TrendingUp, TrendingDown, EyeOff, FileText } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronUp, DollarSign, Target, TrendingUp, TrendingDown, EyeOff, FileText, Tag, Filter } from "lucide-react";
 import { ComparisonStats } from "@/lib/trading-comparison-stats-processor";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { TagAssignment } from "@/lib/trading-data-store";
 
-interface CompareNote {
+interface TagDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  createdAt: string;
+  lastUsed?: string;
+  usageCount: number;
+}
+
+interface CompareTaggedDay {
   date: string;
-  notes: string;
+  tagAssignments: TagAssignment[];
   comparePnl: number;
   basePnl: number;
   pnlDifference: number;
@@ -24,22 +36,37 @@ interface CompareNote {
   verifiedBy?: string;
 }
 
+interface TagAnalytics {
+  tagId: string;
+  tag: TagDefinition;
+  totalDays: number;
+  positiveDays: number;
+  negativeDays: number;
+  totalPnlImpact: number;
+  avgPnlImpact: number;
+}
+
 export default function CompareViewPage() {
   const [weeks, setWeeks] = useState<any[]>([]);
   const [stats, setStats] = useState<ComparisonStats | null>(null);
-  const [notesData, setNotesData] = useState<CompareNote[]>([]);
+  const [taggedDays, setTaggedDays] = useState<CompareTaggedDay[]>([]);
+  const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
+  const [tagAnalytics, setTagAnalytics] = useState<TagAnalytics[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statsExpanded, setStatsExpanded] = useState(false);
-  const [notesExpanded, setNotesExpanded] = useState(false);
+  const [tagsExpanded, setTagsExpanded] = useState(false);
   const [showOnlyUnverified, setShowOnlyUnverified] = useState(false);
+  const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all');
 
   const fetchData = async () => {
     try {
-      const [weeksRes, statsRes, notesRes] = await Promise.all([
+      const tagFilterParam = selectedTagFilter === 'all' ? '' : `&tagFilter=${selectedTagFilter}`;
+      const [weeksRes, statsRes, taggedDaysRes, tagDefinitionsRes] = await Promise.all([
         fetch(`/api/trading-data/compare${showOnlyUnverified ? '?unverifiedOnly=true' : ''}`),
         fetch(`/api/trading-data/compare/stats${showOnlyUnverified ? '?unverifiedOnly=true' : ''}`),
-        fetch(`/api/trading-data/compare/notes${showOnlyUnverified ? '?unverifiedOnly=true' : ''}`)
+        fetch(`/api/trading-data/compare/tags${showOnlyUnverified || selectedTagFilter !== 'all' ? '?' : ''}${showOnlyUnverified ? 'unverifiedOnly=true' : ''}${tagFilterParam}`),
+        fetch('/api/trading-data/tags')
       ]);
 
       if (!weeksRes.ok) {
@@ -48,14 +75,18 @@ export default function CompareViewPage() {
       if (!statsRes.ok) {
         throw new Error(`Failed to fetch comparison stats: ${statsRes.statusText}`);
       }
-      if (!notesRes.ok) {
-        throw new Error(`Failed to fetch comparison notes: ${notesRes.statusText}`);
+      if (!taggedDaysRes.ok) {
+        throw new Error(`Failed to fetch tagged days: ${taggedDaysRes.statusText}`);
+      }
+      if (!tagDefinitionsRes.ok) {
+        throw new Error(`Failed to fetch tag definitions: ${tagDefinitionsRes.statusText}`);
       }
 
-      const [weeksData, statsData, notesData] = await Promise.all([
+      const [weeksData, statsData, taggedDaysData, tagDefinitionsData] = await Promise.all([
         weeksRes.json(),
         statsRes.json(),
-        notesRes.json()
+        taggedDaysRes.json(),
+        tagDefinitionsRes.json()
       ]);
 
       if (!Array.isArray(weeksData)) {
@@ -64,7 +95,11 @@ export default function CompareViewPage() {
 
       setWeeks(weeksData);
       setStats(statsData);
-      setNotesData(notesData);
+      setTaggedDays(taggedDaysData);
+      setTagDefinitions(tagDefinitionsData);
+      
+      // Calculate tag analytics
+      calculateTagAnalytics(taggedDaysData, tagDefinitionsData);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Failed to load comparison data");
     } finally {
@@ -72,9 +107,64 @@ export default function CompareViewPage() {
     }
   };
 
+  const calculateTagAnalytics = (taggedDaysData: CompareTaggedDay[], tagDefinitionsData: TagDefinition[]) => {
+    const analytics = new Map<string, TagAnalytics>();
+
+    // Initialize analytics for each tag
+    tagDefinitionsData.forEach(tag => {
+      analytics.set(tag.id, {
+        tagId: tag.id,
+        tag,
+        totalDays: 0,
+        positiveDays: 0,
+        negativeDays: 0,
+        totalPnlImpact: 0,
+        avgPnlImpact: 0
+      });
+    });
+
+    // Calculate metrics for each tagged day
+    taggedDaysData.forEach(day => {
+      day.tagAssignments.forEach(assignment => {
+        const analytic = analytics.get(assignment.tagId);
+        if (analytic) {
+          analytic.totalDays++;
+          if (assignment.impact === 'positive') {
+            analytic.positiveDays++;
+          } else {
+            analytic.negativeDays++;
+          }
+          // Only add PnL impact if the assignment impact matches the actual PnL direction
+          if (
+            (assignment.impact === 'positive' && day.pnlDifference > 0) ||
+            (assignment.impact === 'negative' && day.pnlDifference < 0)
+          ) {
+            analytic.totalPnlImpact += Math.abs(day.pnlDifference);
+          } else if (
+            (assignment.impact === 'positive' && day.pnlDifference < 0) ||
+            (assignment.impact === 'negative' && day.pnlDifference > 0)
+          ) {
+            analytic.totalPnlImpact -= Math.abs(day.pnlDifference);
+          }
+        }
+      });
+    });
+
+    // Calculate averages and filter out tags with no data
+    const analyticsArray = Array.from(analytics.values())
+      .filter(analytic => analytic.totalDays > 0)
+      .map(analytic => ({
+        ...analytic,
+        avgPnlImpact: analytic.totalPnlImpact / analytic.totalDays
+      }))
+      .sort((a, b) => Math.abs(b.totalPnlImpact) - Math.abs(a.totalPnlImpact));
+
+    setTagAnalytics(analyticsArray);
+  };
+
   useEffect(() => {
     fetchData();
-  }, [showOnlyUnverified]);
+  }, [showOnlyUnverified, selectedTagFilter]);
 
   const handleWeekMerged = async () => {
     // Refresh the data after a week is merged
@@ -157,21 +247,52 @@ export default function CompareViewPage() {
         <h1 className="text-4xl font-bold mb-4">Trading Levels Algo Comparison</h1>
         
         {/* Filter Controls */}
-        <div className="flex items-center space-x-2 mb-4">
-          <Switch
-            id="unverified-filter"
-            checked={showOnlyUnverified}
-            onCheckedChange={setShowOnlyUnverified}
-          />
-          <Label htmlFor="unverified-filter" className="flex items-center gap-2 cursor-pointer">
-            <EyeOff className="w-4 h-4" />
-            Show only unverified days
-          </Label>
-          {showOnlyUnverified && (
-            <Badge variant="secondary" className="ml-2">
-              {weeks.reduce((total, week) => total + week.days.length, 0)} unverified days
-            </Badge>
-          )}
+        <div className="flex flex-wrap items-center gap-4 mb-4">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="unverified-filter"
+              checked={showOnlyUnverified}
+              onCheckedChange={setShowOnlyUnverified}
+            />
+            <Label htmlFor="unverified-filter" className="flex items-center gap-2 cursor-pointer">
+              <EyeOff className="w-4 h-4" />
+              Show only unverified days
+            </Label>
+            {showOnlyUnverified && (
+              <Badge variant="secondary" className="ml-2">
+                {weeks.reduce((total, week) => total + week.days.length, 0)} unverified days
+              </Badge>
+            )}
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <Label htmlFor="tag-filter">Filter by tag:</Label>
+            <Select value={selectedTagFilter} onValueChange={setSelectedTagFilter}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All tags</SelectItem>
+                {tagDefinitions.map(tag => (
+                  <SelectItem key={tag.id} value={tag.id}>
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-3 h-3 rounded-full" 
+                        style={{ backgroundColor: tag.color }}
+                      />
+                      {tag.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedTagFilter !== 'all' && (
+              <Badge variant="secondary" className="ml-2">
+                {taggedDays.length} tagged days
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
 
@@ -499,33 +620,88 @@ export default function CompareViewPage() {
             )}
           </Card>
 
-          {/* Compare Notes Log */}
-          {notesData.length > 0 && (
+          {/* Tag Analytics */}
+          {tagAnalytics.length > 0 && (
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Tag className="w-5 h-5" />
+                  Tag Performance Analytics
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {tagAnalytics.map((analytic) => (
+                    <div key={analytic.tagId} className={`p-4 rounded-lg border ${
+                      analytic.totalPnlImpact >= 0 ? 'border-green-500/30 bg-green-500/10' : 'border-red-500/30 bg-red-500/10'
+                    }`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: analytic.tag.color }}
+                          />
+                          <span className="font-medium text-sm">{analytic.tag.name}</span>
+                        </div>
+                        <div className={`flex items-center gap-1 ${getPnlColor(analytic.totalPnlImpact)}`}>
+                          {getPnlIcon(analytic.totalPnlImpact)}
+                          <span className="font-bold text-sm">{formatCurrency(analytic.totalPnlImpact)}</span>
+                        </div>
+                      </div>
+                      <div className="space-y-1 text-xs text-muted-foreground">
+                        <div className="flex justify-between">
+                          <span>Total days:</span>
+                          <span className="font-medium">{analytic.totalDays}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Positive impact:</span>
+                          <span className="font-medium text-green-600">{analytic.positiveDays}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Negative impact:</span>
+                          <span className="font-medium text-red-600">{analytic.negativeDays}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Avg per day:</span>
+                          <span className={`font-medium ${getPnlColor(analytic.avgPnlImpact)}`}>
+                            {formatCurrency(analytic.avgPnlImpact)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tagged Days Log */}
+          {taggedDays.length > 0 && (
             <Card className="mb-6">
               <CardHeader
                 className="cursor-pointer hover:bg-muted/50 transition-colors"
-                onClick={() => setNotesExpanded(!notesExpanded)}
+                onClick={() => setTagsExpanded(!tagsExpanded)}
               >
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
-                    <FileText className="w-5 h-5" />
-                    Updated Notes Log
+                    <Tag className="w-5 h-5" />
+                    Tagged Days Log
                     <Badge variant="secondary" className="ml-2">
-                      {notesData.length} notes
+                      {taggedDays.length} tagged days
                     </Badge>
                   </CardTitle>
-                  {notesExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                  {tagsExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                 </div>
               </CardHeader>
-              {notesExpanded && (
+              {tagsExpanded && (
                 <CardContent>
                   <div className="space-y-4">
-                    {notesData.map((note, index) => (
-                      <div key={index} className={`p-4 rounded-lg border ${note.verified ? 'border-green-500/30 bg-green-500/10' : 'border-muted'}`}>
+                    {taggedDays.map((day, index) => (
+                      <div key={index} className={`p-4 rounded-lg border ${day.verified ? 'border-green-500/30 bg-green-500/10' : 'border-muted'}`}>
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{note.date}</span>
-                            {note.verified && (
+                            <span className="font-medium text-sm">{day.date}</span>
+                            {day.verified && (
                               <Badge variant="outline" className="text-green-600 border-green-600">
                                 Verified
                               </Badge>
@@ -533,20 +709,41 @@ export default function CompareViewPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="text-right">
-                              <div className="text-sm text-muted-foreground">Updated: {formatCurrency(note.comparePnl)}</div>
-                              <div className="text-sm text-muted-foreground">Original: {formatCurrency(note.basePnl)}</div>
+                              <div className="text-sm text-muted-foreground">Updated: {formatCurrency(day.comparePnl)}</div>
+                              <div className="text-sm text-muted-foreground">Original: {formatCurrency(day.basePnl)}</div>
                             </div>
-                            <div className={`flex items-center gap-1 ${getPnlColor(note.pnlDifference)}`}>
-                              {getPnlIcon(note.pnlDifference)}
-                              <span className="font-bold">{formatCurrency(note.pnlDifference)}</span>
+                            <div className={`flex items-center gap-1 ${getPnlColor(day.pnlDifference)}`}>
+                              {getPnlIcon(day.pnlDifference)}
+                              <span className="font-bold">{formatCurrency(day.pnlDifference)}</span>
                             </div>
                           </div>
                         </div>
-                        <div className="text-sm whitespace-pre-wrap">{note.notes}</div>
-                        {note.verified && note.verifiedAt && (
+                        <div className="flex flex-wrap gap-2">
+                          {day.tagAssignments.map((assignment, tagIndex) => {
+                            const tagDef = tagDefinitions.find(t => t.id === assignment.tagId);
+                            if (!tagDef) return null;
+                            
+                            return (
+                              <Badge
+                                key={tagIndex}
+                                variant="outline"
+                                className="flex items-center gap-1"
+                                style={{ borderColor: tagDef.color + '40', backgroundColor: tagDef.color + '10' }}
+                              >
+                                <span style={{ color: tagDef.color }}>{tagDef.name}</span>
+                                {assignment.impact === 'positive' ? (
+                                  <TrendingUp className="w-3 h-3 text-green-500" />
+                                ) : (
+                                  <TrendingDown className="w-3 h-3 text-red-500" />
+                                )}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                        {day.verified && day.verifiedAt && (
                           <div className="text-xs text-muted-foreground mt-2">
-                            Verified {new Date(note.verifiedAt).toLocaleDateString()}
-                            {note.verifiedBy && ` by ${note.verifiedBy}`}
+                            Verified {new Date(day.verifiedAt).toLocaleDateString()}
+                            {day.verifiedBy && ` by ${day.verifiedBy}`}
                           </div>
                         )}
                       </div>

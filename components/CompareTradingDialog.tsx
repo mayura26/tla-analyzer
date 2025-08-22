@@ -9,10 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { compareTradingLogs } from "@/lib/trading-log-comparator";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { TagAssignmentInterface } from "./TagAssignmentInterface";
+import type { TagAssignment } from "@/lib/trading-data-store";
 
 interface CompareTradingDialogProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ type SessionKey = keyof DailyStats['sessionBreakdown'];
 export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats, onMerge, onVerificationChange, onNotesChange }: CompareTradingDialogProps) {
   const [isVerified, setIsVerified] = useState(false);
   const [notes, setNotes] = useState("");
+  const [tagAssignments, setTagAssignments] = useState<TagAssignment[]>([]);
   const [baseDayNotes, setBaseDayNotes] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -175,6 +177,7 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
         if (data.metadata) {
           setIsVerified(data.metadata.verified || false);
           setNotes(data.metadata.notes || "");
+          setTagAssignments(data.metadata.tagAssignments || []);
         }
       }
       
@@ -974,44 +977,15 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
             </div>
           )}
 
-          {/* Compare Notes */}
-          <div className="space-y-2">
-            <Label>Compare Notes</Label>
-            <Textarea
-              placeholder="Add any notes about the changes or verification..."
-              value={notes}
-              onChange={(e) => handleNotesChange(e.target.value)}
-              className="min-h-[100px]"
-              disabled={isLoading}
-            />
-            <div className="flex items-center justify-between">
-              {isSaving && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Saving notes...
-                </div>
-              )}
-              {hasUnsavedNotes && !isSaving && (
-                <div className="text-sm text-muted-foreground">
-                  You have unsaved changes
-                </div>
-              )}
-              <Button
-                onClick={handleSaveNotes}
-                disabled={!hasUnsavedNotes || isSaving || isLoading}
-                size="sm"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    Saving...
-                  </>
-                ) : (
-                  "Save Notes"
-                )}
-              </Button>
-            </div>
-          </div>
+          {/* Tag Assignment Interface */}
+          <TagAssignmentInterface
+            date={getFormattedDate(baseStats.date)}
+            initialTagAssignments={tagAssignments}
+            onTagAssignmentsChange={(assignments) => {
+              setTagAssignments(assignments);
+            }}
+            disabled={isLoading}
+          />
         </div>
 
         <Separator />

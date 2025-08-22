@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { tradingDataStore } from '@/lib/trading-data-store';
+import { tradingDataStore, type TagAssignment } from '@/lib/trading-data-store';
 
 export async function GET(request: Request) {
   try {
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { action, date, notes, verifiedBy, verified } = await request.json();
+    const { action, date, notes, verifiedBy, verified, tagId, impact, tagAssignments } = await request.json();
         
     if (!action || !date) {
       return NextResponse.json(
@@ -125,6 +125,72 @@ export async function POST(request: Request) {
           message: 'All compare data for the week successfully marked as verified' 
         });
 
+      case 'assignTag':
+        if (!tagId || !impact) {
+          return NextResponse.json(
+            { error: 'TagId and impact are required for assignTag action' },
+            { status: 400 }
+          );
+        }
+        if (impact !== 'positive' && impact !== 'negative') {
+          return NextResponse.json(
+            { error: 'Impact must be either "positive" or "negative"' },
+            { status: 400 }
+          );
+        }
+        result = await tradingDataStore.assignCompareTag(date, tagId, impact);
+        if (!result) {
+          return NextResponse.json(
+            { error: 'Compare data not found for the specified date' },
+            { status: 404 }
+          );
+        }
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Tag assigned to compare data',
+          data: result 
+        });
+
+      case 'removeTag':
+        if (!tagId) {
+          return NextResponse.json(
+            { error: 'TagId is required for removeTag action' },
+            { status: 400 }
+          );
+        }
+        result = await tradingDataStore.removeCompareTag(date, tagId);
+        if (!result) {
+          return NextResponse.json(
+            { error: 'Compare data not found for the specified date' },
+            { status: 404 }
+          );
+        }
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Tag removed from compare data',
+          data: result 
+        });
+
+      case 'updateTags':
+        if (!tagAssignments || !Array.isArray(tagAssignments)) {
+          return NextResponse.json(
+            { error: 'TagAssignments array is required for updateTags action' },
+            { status: 400 }
+          );
+        }
+        result = await tradingDataStore.updateCompareTagAssignments(date, tagAssignments);
+        if (!result) {
+          return NextResponse.json(
+            { error: 'Compare data not found for the specified date' },
+            { status: 404 }
+          );
+        }
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Tag assignments updated for compare data',
+          data: result 
+        });
+
       case 'delete':
         const deleteResult = await tradingDataStore.deleteCompareByDate(date);
         if (!deleteResult) {
@@ -140,7 +206,7 @@ export async function POST(request: Request) {
 
       default:
         return NextResponse.json(
-          { error: 'Invalid action. Supported actions: verify, addNotes, merge, mergeWeek, verifyWeek, delete' },
+          { error: 'Invalid action. Supported actions: verify, addNotes, merge, mergeWeek, verifyWeek, assignTag, removeTag, updateTags, delete' },
           { status: 400 }
         );
     }
