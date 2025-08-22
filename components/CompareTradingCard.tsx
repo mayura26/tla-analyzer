@@ -98,19 +98,19 @@ export function CompareTradingCard({ baseStats, compareStats, metadata, onMerge 
 
   const hasChanges = pnlDiff.value !== 0 || tradesDiff !== 0 || winsDiff !== 0 || lossesDiff !== 0 || bigWinDiff !== 0 || bigLossDiff !== 0;
 
-  // Enhanced badge color function for theme-aware styling
+  // Enhanced badge color function with muted green/red colors
   const getBadgeColors = (value: number) => {
     const abs = Math.abs(value);
     if (value >= 0) {
-      if (abs < 40) return 'bg-muted text-muted-foreground border-border';
-      if (abs < 150) return 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/50 dark:text-green-400 dark:border-green-800';
-      if (abs < 300) return 'bg-green-100 text-green-800 border-green-300 dark:bg-green-950/70 dark:text-green-300 dark:border-green-700';
-      return 'bg-green-200 text-green-900 border-green-400 dark:bg-green-950/90 dark:text-green-200 dark:border-green-600';
+      if (abs <= 50) return 'bg-green-50 text-green-700 border-green-300 dark:bg-green-950/40 dark:text-green-500 dark:border-green-600';
+      if (abs < 150) return 'bg-green-200 text-green-900 border-green-400 dark:bg-green-950/60 dark:text-green-300 dark:border-green-700';
+      if (abs < 300) return 'bg-green-300 text-green-900 border-green-500 dark:bg-green-950/70 dark:text-green-200 dark:border-green-600';
+      return 'bg-green-400 text-green-900 border-green-600 dark:bg-green-950/80 dark:text-green-100 dark:border-green-500';
     } else {
-      if (abs < 40) return 'bg-muted text-muted-foreground border-border';
-      if (abs < 150) return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-400 dark:border-red-800';
-      if (abs < 300) return 'bg-red-100 text-red-800 border-red-300 dark:bg-red-950/70 dark:text-red-300 dark:border-red-700';
-      return 'bg-red-200 text-red-900 border-red-400 dark:bg-red-950/90 dark:text-red-200 dark:border-red-600';
+      if (abs <= 50) return 'bg-red-50 text-red-700 border-red-300 dark:bg-red-950/40 dark:text-red-500 dark:border-red-600';
+      if (abs < 150) return 'bg-red-200 text-red-900 border-red-400 dark:bg-red-950/60 dark:text-red-300 dark:border-red-700';
+      if (abs < 300) return 'bg-red-300 text-red-900 border-red-500 dark:bg-red-950/70 dark:text-red-200 dark:border-red-600';
+      return 'bg-red-400 text-red-900 border-red-600 dark:bg-red-950/80 dark:text-red-100 dark:border-red-500';
     }
   };
 

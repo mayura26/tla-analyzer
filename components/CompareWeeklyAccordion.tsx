@@ -67,18 +67,18 @@ export function CompareWeeklyAccordion({ weeks, onWeekMerged }: CompareWeeklyAcc
     };
   };
 
-  // Nuanced PnL diff color function (match CompareTradingCard)
+  // Enhanced PnL diff color function with muted green/red colors
   const getPnlDiffColor = (value: number) => {
     const abs = Math.abs(value);
     if (value >= 0) {
-      if (abs < 40) return 'text-gray-100';
-      if (abs < 150) return 'text-green-400';
-      if (abs < 300) return 'text-green-600 font-bold';
+      if (abs <= 50) return 'text-green-500';
+      if (abs < 150) return 'text-green-600 font-bold';
+      if (abs < 300) return 'text-green-700 font-bold';
       return 'text-green-800 font-extrabold';
     } else {
-      if (abs < 40) return 'text-gray-100';
-      if (abs < 150) return 'text-red-400';
-      if (abs < 300) return 'text-red-600 font-bold';
+      if (abs <= 50) return 'text-red-500';
+      if (abs < 150) return 'text-red-600 font-bold';
+      if (abs < 300) return 'text-red-700 font-bold';
       return 'text-red-800 font-extrabold';
     }
   };

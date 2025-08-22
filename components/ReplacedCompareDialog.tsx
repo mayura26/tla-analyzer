@@ -221,6 +221,22 @@ export function ReplacedCompareDialog({
     return value >= 0 ? 'text-green-500' : 'text-red-500';
   };
 
+  // Enhanced badge color function with muted green/red colors
+  const getBadgeColors = (value: number) => {
+    const abs = Math.abs(value);
+    if (value >= 0) {
+      if (abs <= 50) return 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-600 dark:border-green-700';
+      if (abs < 150) return 'bg-green-200 text-green-900 border-green-400 dark:bg-green-950/60 dark:text-green-300 dark:border-green-700';
+      if (abs < 300) return 'bg-green-300 text-green-900 border-green-500 dark:bg-green-950/70 dark:text-green-200 dark:border-green-600';
+      return 'bg-green-400 text-green-900 border-green-600 dark:bg-green-950/80 dark:text-green-100 dark:border-green-500';
+    } else {
+      if (abs <= 50) return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-600 dark:border-red-700';
+      if (abs < 150) return 'bg-red-200 text-red-900 border-red-400 dark:bg-red-950/60 dark:text-red-300 dark:border-red-700';
+      if (abs < 300) return 'bg-red-300 text-red-900 border-red-500 dark:bg-red-950/70 dark:text-red-200 dark:border-red-600';
+      return 'bg-red-400 text-red-900 border-red-600 dark:bg-red-950/80 dark:text-red-100 dark:border-red-500';
+    }
+  };
+
   const formatTime = (dateInput: Date | string) => {
     const date = typeof dateInput === 'string' ? parseISO(dateInput) : dateInput;
     return formatInTimeZone(date, 'UTC', 'HH:mm');
@@ -742,9 +758,9 @@ export function ReplacedCompareDialog({
               </Badge>
             </div>
             {currentCompareData && (
-              <span className={`font-bold text-lg ${getPnlColor(currentCompareData.analysis.headline.totalPnl - replacedData.analysis.headline.totalPnl)}`}> 
+              <Badge className={`font-bold text-lg px-3 py-1 ${getBadgeColors(currentCompareData.analysis.headline.totalPnl - replacedData.analysis.headline.totalPnl)}`}>
                 {formatCurrency(currentCompareData.analysis.headline.totalPnl - replacedData.analysis.headline.totalPnl)}
-              </span>
+              </Badge>
             )}
           </div>
           
@@ -765,8 +781,14 @@ export function ReplacedCompareDialog({
 
             <div className="bg-background/50 rounded-lg p-3 border border-muted-foreground/20">
               <div className="text-sm text-muted-foreground mb-1">Difference</div>
-              <div className={`text-lg font-semibold ${currentCompareData ? getPnlColor(currentCompareData.analysis.headline.totalPnl - replacedData.analysis.headline.totalPnl) : 'text-muted-foreground'}`}>
-                {currentCompareData ? formatCurrency(currentCompareData.analysis.headline.totalPnl - replacedData.analysis.headline.totalPnl) : 'Loading...'}
+              <div className={`text-lg font-semibold ${currentCompareData ? '' : 'text-muted-foreground'}`}>
+                {currentCompareData ? (
+                  <Badge className={`px-2 py-1 ${getBadgeColors(currentCompareData.analysis.headline.totalPnl - replacedData.analysis.headline.totalPnl)}`}>
+                    {formatCurrency(currentCompareData.analysis.headline.totalPnl - replacedData.analysis.headline.totalPnl)}
+                  </Badge>
+                ) : (
+                  'Loading...'
+                )}
               </div>
             </div>
           </div>

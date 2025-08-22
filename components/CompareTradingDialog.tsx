@@ -366,6 +366,22 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
     return value >= 0 ? 'text-green-500' : 'text-red-500';
   };
 
+  // Enhanced badge color function with muted green/red colors
+  const getBadgeColors = (value: number) => {
+    const abs = Math.abs(value);
+    if (value >= 0) {
+      if (abs <= 50) return 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-600 dark:border-green-700';
+      if (abs < 150) return 'bg-green-200 text-green-900 border-green-400 dark:bg-green-950/60 dark:text-green-300 dark:border-green-700';
+      if (abs < 300) return 'bg-green-300 text-green-900 border-green-500 dark:bg-green-950/70 dark:text-green-200 dark:border-green-600';
+      return 'bg-green-400 text-green-900 border-green-600 dark:bg-green-950/80 dark:text-green-100 dark:border-green-500';
+    } else {
+      if (abs <= 50) return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-600 dark:border-red-700';
+      if (abs < 150) return 'bg-red-200 text-red-900 border-red-400 dark:bg-red-950/60 dark:text-red-300 dark:border-red-700';
+      if (abs < 300) return 'bg-red-300 text-red-900 border-red-500 dark:bg-red-950/70 dark:text-red-200 dark:border-red-600';
+      return 'bg-red-400 text-red-900 border-red-600 dark:bg-red-950/80 dark:text-red-100 dark:border-red-500';
+    }
+  };
+
   // Format time without timezone conversion - display exactly as in file
   const formatTime = (dateInput: Date | string) => {
     // Convert string to Date if needed
@@ -535,12 +551,7 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
               {isModified && pnlChange ? (
                 <div className="flex items-center gap-1">
                   <Badge 
-                    variant="outline" 
-                    className={`${
-                      pnlChange.newValue - pnlChange.oldValue >= 0 
-                        ? 'bg-green-400/20 text-green-400 border-green-400/30' 
-                        : 'bg-red-400/20 text-red-400 border-red-400/30'
-                    }`}
+                    className={`${getBadgeColors(pnlChange.newValue - pnlChange.oldValue)}`}
                   >
                     Δ {formatCurrency(pnlChange.newValue - pnlChange.oldValue)}
                   </Badge>
@@ -618,12 +629,7 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
             {isModified && pnlChange ? (
               <div className="flex items-center gap-1">
                 <Badge 
-                  variant="outline" 
-                  className={`${
-                    pnlChange.newValue - pnlChange.oldValue >= 0 
-                      ? 'bg-green-400/20 text-green-400 border-green-400/30' 
-                      : 'bg-red-400/20 text-red-400 border-red-400/30'
-                  }`}
+                  className={`${getBadgeColors(pnlChange.newValue - pnlChange.oldValue)}`}
                 >
                   {formatCurrency(pnlChange.newValue - pnlChange.oldValue)}
                 </Badge>
@@ -785,7 +791,9 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
               <div className="mt-2 pt-2 border-t">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Difference</span>
-                  <span className={`font-medium ${getPnlColor(pnlDiff.value)}`}>{formatDifference(pnlDiff)}</span>
+                  <Badge className={`font-medium px-2 py-1 ${getBadgeColors(pnlDiff.value)}`}>
+                    {formatDifference(pnlDiff)}
+                  </Badge>
                 </div>
               </div>
             </div>
@@ -1051,9 +1059,9 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
                   </div>
                 )}
               </div>
-              <span className={`font-bold text-lg ${getPnlColor(compareStats.totalPnl - baseStats.totalPnl)}`}> 
+              <Badge className={`font-bold text-lg px-3 py-1 ${getBadgeColors(compareStats.totalPnl - baseStats.totalPnl)}`}>
                 {formatCurrency(compareStats.totalPnl - baseStats.totalPnl)}
-              </span>
+              </Badge>
             </div>
             
             <div className="grid grid-cols-2 gap-4">

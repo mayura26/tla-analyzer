@@ -97,17 +97,17 @@ export default function ComparePage() {
     }
   };
 
-  // Function to get difference badge color and text color for dark theme readability
+  // Function to get difference badge color with muted green/red colors
   const getDifferenceBadgeClass = (value: number) => {
     if (value >= 0) {
-      if (value <= 50) return 'bg-gray-600 text-white border border-gray-400';
+      if (value <= 50) return 'bg-green-50 text-green-700 border border-green-200';
       if (value <= 150) return 'bg-green-200 text-green-900 border border-green-400';
       if (value <= 300) return 'bg-green-300 text-green-900 border border-green-400';
       return 'bg-green-600 text-white border border-green-700';
     } else {
-      if (value >= -50) return 'bg-gray-600 text-white border border-gray-400';
+      if (value >= -50) return 'bg-red-50 text-red-700 border border-red-200';
       if (value >= -150) return 'bg-red-200 text-red-900 border border-red-400';
-      if (value >= -300) return 'bg-red-400 text-white border border-red-600';
+      if (value >= -300) return 'bg-red-300 text-white border border-red-500';
       return 'bg-red-600 text-white border border-red-700';
     }
   };
