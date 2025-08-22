@@ -82,7 +82,7 @@ export default function ComparePage() {
     baseStats: DailyStats & { tradeList?: TradeListEntry[] };
     compareStats: DailyStats & { tradeList?: TradeListEntry[] };
   } | null>(null);
-  const [loadingDialogData, setLoadingDialogData] = useState(false);
+  const [loadingDialogData, setLoadingDialogData] = useState<Set<string>>(new Set());
 
   // Function to get PnL color based on value (same logic as trading card)
   const getPnlColor = (value: number) => {
@@ -278,7 +278,7 @@ export default function ComparePage() {
       return;
     }
 
-    setLoadingDialogData(true);
+    setLoadingDialogData(prev => new Set(prev).add(submission.id));
     try {
       // Convert date format for API call (MM/DD/YYYY to YYYY-MM-DD)
       const dateParts = submission.dataDate.split('/');
@@ -317,7 +317,11 @@ export default function ComparePage() {
       console.error('Error fetching comparison data:', error);
       toast.error("Failed to load comparison data");
     } finally {
-      setLoadingDialogData(false);
+      setLoadingDialogData(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(submission.id);
+        return newSet;
+      });
     }
   };
 
@@ -494,11 +498,11 @@ export default function ComparePage() {
                               <span className="text-muted-foreground">•</span>
                               <Badge 
                                 variant="secondary" 
-                                className={`text-xs font-bold cursor-pointer hover:opacity-80 transition-opacity ${getDifferenceBadgeClass(log.pnlDifference)} ${loadingDialogData ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                onClick={() => !loadingDialogData && handlePnlDiffClick(log)}
-                                title={loadingDialogData ? "Loading comparison data..." : "Click to view detailed comparison"}
+                                className={`text-xs font-bold cursor-pointer hover:opacity-80 transition-opacity ${getDifferenceBadgeClass(log.pnlDifference)} ${loadingDialogData.has(log.id) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                onClick={() => !loadingDialogData.has(log.id) && handlePnlDiffClick(log)}
+                                title={loadingDialogData.has(log.id) ? "Loading comparison data..." : "Click to view detailed comparison"}
                               >
-                                {loadingDialogData ? "Loading..." : `Diff: ${log.pnlDifference >= 0 ? '+' : '-'}$${Math.abs(log.pnlDifference).toFixed(2)}`}
+                                {loadingDialogData.has(log.id) ? "Loading..." : `Diff: ${log.pnlDifference >= 0 ? '+' : '-'}$${Math.abs(log.pnlDifference).toFixed(2)}`}
                               </Badge>
                             </>
                           )}

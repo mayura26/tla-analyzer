@@ -685,6 +685,22 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
           </div>
         )}
 
+        {/* Trade Fill Details - Predictive Reversal Only */}
+        {trade.isPredictiveReversal === true && (
+          <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+            <div className="text-xs text-muted-foreground mb-1">Fill Details:</div>
+            <div className="flex items-center gap-1 text-xs">
+              <span className="text-muted-foreground">Predictive:</span>
+              <Badge 
+                variant="outline" 
+                className="text-xs bg-blue-400/20 text-blue-400 border-blue-400/30"
+              >
+                Reversal
+              </Badge>
+            </div>
+          </div>
+        )}
+
         {isModified && (filteredChanges.length > 0 || subTradeComparison) && (
           <div className="mt-2 pt-2 border-t">
             <div className="text-xs text-muted-foreground">Changes:</div>

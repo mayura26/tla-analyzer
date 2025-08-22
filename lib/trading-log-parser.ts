@@ -94,6 +94,12 @@ export interface TradeListEntry {
     exitTimestamp: Date;
   }[];
   isChaseTrade: boolean;
+  // New fields for detailed trade fill information
+  barHigh?: number;
+  barHighDistance?: number;
+  volumeTradeLength?: number;
+  fillDistance?: number;
+  isPredictiveReversal?: boolean;
 }
 
 export interface ExpandedDailyStats extends Omit<DailyStats, 
@@ -308,7 +314,7 @@ export function parseTradingLog(logData: string): TradingLogAnalysis {
       });
     }
 
-    // Trade fill
+    // Trade fill - handle both old and new detailed formats
     const fillMatch = line.match(/\[TRADE FILL \(ID: (\d+)\)\] (LONG|SHORT) FILLED: ([\d.]+)/);
     if (fillMatch && timestamp) {
       const id = parseInt(fillMatch[1]);
@@ -322,6 +328,16 @@ export function parseTradingLog(logData: string): TradingLogAnalysis {
         subTrades: [],
         isChaseTrade: false
       };
+
+      // Check if this is a detailed trade fill with additional information
+      const detailedFillMatch = line.match(/\[TRADE FILL \(ID: (\d+)\)\] (LONG|SHORT) FILLED: ([\d.]+) \| Bar High: ([\d.]+)\(([\d.]+)\) \| Vol Trade Length: (\d+) \| Fill Distance: ([\d.]+) \| Predictive Reversal: (True|False)/);
+      if (detailedFillMatch) {
+        trade.isPredictiveReversal = detailedFillMatch[8] === 'True';
+      } else {
+        // For old data without the detailed fields, assume not a predictive reversal trade
+        trade.isPredictiveReversal = false;
+      }
+
       tradeMap[id] = trade;
       continue;
     }

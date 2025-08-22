@@ -69,6 +69,27 @@ function getTradeChanges(baseTrade: TradeListEntry, compareTrade: TradeListEntry
           newValue: compareSubTrades,
         });
       }
+         } else if (k === 'isPredictiveReversal') {
+       // Special handling for isPredictiveReversal field
+       // Show difference when:
+       // - false to true (actual change)
+       // - true to false (actual change) 
+       // - undefined to true (new data shows it's a predictive reversal)
+       // Don't show difference when going from undefined to false (both are non-predictive)
+       const baseValue = baseTrade.isPredictiveReversal;
+       const compareValue = compareTrade.isPredictiveReversal;
+       
+       // Only show difference if there's an actual meaningful change
+       if (baseValue !== compareValue) {
+         // Don't show difference when both are effectively false (undefined -> false)
+         if (!(baseValue === undefined && compareValue === false)) {
+           changes.push({
+             field: k,
+             oldValue: baseValue ?? false, // Show false for undefined in UI
+             newValue: compareValue ?? false, // Show false for undefined in UI
+           });
+         }
+       }
     } else if (JSON.stringify(compareTrade[k]) !== JSON.stringify(baseTrade[k])) {
       changes.push({
         field: k,
