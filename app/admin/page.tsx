@@ -308,8 +308,9 @@ export default function AdminPage() {
     }
   };
 
-  const dataFiles = files.filter(file => file.name !== 'notes.json');
+  const mainDataFiles = files.filter(file => ['all-days.json', 'compare-data.json', 'replaced-compare-data.json'].includes(file.name));
   const noteFiles = files.filter(file => file.name === 'notes.json');
+  const configFiles = files.filter(file => ['tags-definitions.json', 'backtest-queue.json'].includes(file.name));
   const existingFiles = files.filter(file => file.exists);
 
   const handleReplacedDataClick = (item: ReplacedCompareData) => {
@@ -640,7 +641,42 @@ export default function AdminPage() {
                 Main Data Files
               </h3>
               <div className="space-y-2">
-                {dataFiles.map((file) => (
+                {mainDataFiles.map((file) => (
+                  <div key={file.name} className="flex items-center justify-between p-2 border rounded">
+                    <div>
+                      <p className="font-medium">{file.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {file.description} ({file.size})
+                        {file.lastModified && (
+                          <span className="block text-xs">
+                            Last modified: {new Date(file.lastModified).toLocaleDateString()}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownload(file.name)}
+                      disabled={!file.exists}
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      {file.exists ? 'Download' : 'Not Found'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <Separator />
+
+            <div>
+              <h3 className="font-semibold mb-2 flex items-center gap-2">
+                <Database className="h-4 w-4" />
+                Configuration Files
+              </h3>
+              <div className="space-y-2">
+                {configFiles.map((file) => (
                   <div key={file.name} className="flex items-center justify-between p-2 border rounded">
                     <div>
                       <p className="font-medium">{file.name}</p>
@@ -732,7 +768,7 @@ export default function AdminPage() {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Upload a ZIP file containing all data files (all-days.json, compare-data.json, replaced-compare-data.json, notes.json)
+                  Upload a ZIP file containing all data files (all-days.json, compare-data.json, replaced-compare-data.json, notes.json, tags-definitions.json, backtest-queue.json)
                 </p>
               </div>
 
@@ -802,6 +838,38 @@ export default function AdminPage() {
                 <p className="text-xs text-muted-foreground mt-1">Will be saved as: notes.json</p>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Upload Tag Definitions File (tags-definitions.json)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={(e) => handleUpload(e, "tags-definitions")}
+                    disabled={uploading || uploadingAll}
+                    className="flex-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Will be saved as: tags-definitions.json</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Upload Backtest Queue File (backtest-queue.json)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={(e) => handleUpload(e, "backtest-queue")}
+                    disabled={uploading || uploadingAll}
+                    className="flex-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Will be saved as: backtest-queue.json</p>
+              </div>
+
               {uploadStatus && (
                 <div className={`p-3 rounded-md text-sm ${
                   uploadStatus.includes('successful') || uploadStatus.includes('Successfully')
@@ -822,6 +890,8 @@ export default function AdminPage() {
                   <li>Uploading will replace existing files (automatic backup created)</li>
                   <li>Maximum file size: 50MB for ZIP, 10MB for individual files</li>
                   <li>Notes file must follow the new single-file format with notes object and lastUpdated property</li>
+                  <li>Tag definitions file must contain tags array and lastUpdated property</li>
+                  <li>Backtest queue file must contain items object and lastUpdated property</li>
                 </ul>
               </div>
             </div>
@@ -851,7 +921,7 @@ export default function AdminPage() {
                     variant="destructive"
                     size="sm"
                     onClick={() => handleClear('all-days')}
-                    disabled={clearing || !dataFiles.find(f => f.name === 'all-days.json')?.exists}
+                    disabled={clearing || !mainDataFiles.find(f => f.name === 'all-days.json')?.exists}
                     className="w-full justify-start"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -862,7 +932,7 @@ export default function AdminPage() {
                     variant="destructive"
                     size="sm"
                     onClick={() => handleClear('compare-data')}
-                    disabled={clearing || !dataFiles.find(f => f.name === 'compare-data.json')?.exists}
+                    disabled={clearing || !mainDataFiles.find(f => f.name === 'compare-data.json')?.exists}
                     className="w-full justify-start"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -873,7 +943,7 @@ export default function AdminPage() {
                     variant="destructive"
                     size="sm"
                     onClick={() => handleClear('replaced-compare-data')}
-                    disabled={clearing || !dataFiles.find(f => f.name === 'replaced-compare-data.json')?.exists}
+                    disabled={clearing || !mainDataFiles.find(f => f.name === 'replaced-compare-data.json')?.exists}
                     className="w-full justify-start"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -889,6 +959,28 @@ export default function AdminPage() {
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Clear notes.json
+                  </Button>
+                  
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleClear('tags-definitions')}
+                    disabled={clearing || !configFiles.find(f => f.name === 'tags-definitions.json')?.exists}
+                    className="w-full justify-start"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear tags-definitions.json
+                  </Button>
+                  
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleClear('backtest-queue')}
+                    disabled={clearing || !configFiles.find(f => f.name === 'backtest-queue.json')?.exists}
+                    className="w-full justify-start"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear backtest-queue.json
                   </Button>
                 </div>
               </div>

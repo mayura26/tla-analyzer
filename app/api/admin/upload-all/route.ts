@@ -75,6 +75,70 @@ const EXPECTED_FILES = {
       }
       return null;
     }
+  },
+  'tags-definitions.json': {
+    description: 'Tag definitions and configuration',
+    validateContent: (parsedJson: any) => {
+      if (!parsedJson.tags || !Array.isArray(parsedJson.tags)) {
+        return 'tags-definitions.json must have a tags array property';
+      }
+      if (!parsedJson.lastUpdated || typeof parsedJson.lastUpdated !== 'string') {
+        return 'tags-definitions.json must have a lastUpdated string property';
+      }
+      // Validate tags structure
+      for (const tag of parsedJson.tags) {
+        if (typeof tag !== 'object' || tag === null) {
+          return 'Each tag must be an object';
+        }
+        if (!tag.id || typeof tag.id !== 'string') {
+          return 'Each tag must have an id string property';
+        }
+        if (!tag.name || typeof tag.name !== 'string') {
+          return 'Each tag must have a name string property';
+        }
+        if (!tag.color || typeof tag.color !== 'string') {
+          return 'Each tag must have a color string property';
+        }
+        if (!tag.createdAt || typeof tag.createdAt !== 'string') {
+          return 'Each tag must have a createdAt string property';
+        }
+        if (tag.usageCount !== undefined && typeof tag.usageCount !== 'number') {
+          return 'Tag usageCount must be a number if present';
+        }
+      }
+      return null;
+    }
+  },
+  'backtest-queue.json': {
+    description: 'Backtest queue and scheduling data',
+    validateContent: (parsedJson: any) => {
+      if (!parsedJson.items || typeof parsedJson.items !== 'object') {
+        return 'backtest-queue.json must have an items object property';
+      }
+      if (!parsedJson.lastUpdated || typeof parsedJson.lastUpdated !== 'string') {
+        return 'backtest-queue.json must have a lastUpdated string property';
+      }
+      // Validate queue items structure
+      for (const [date, item] of Object.entries(parsedJson.items)) {
+        if (typeof item !== 'object' || item === null) {
+          return `Invalid queue item structure for date ${date}. Must be an object`;
+        }
+        const queueItem = item as { date?: string; status?: string; priority?: string; addedAt?: string };
+        if (!queueItem.date || typeof queueItem.date !== 'string') {
+          return `Queue item for date ${date} must have a date string property`;
+        }
+        if (!queueItem.status || typeof queueItem.status !== 'string') {
+          return `Queue item for date ${date} must have a status string property`;
+        }
+        if (!queueItem.priority || typeof queueItem.priority !== 'string') {
+          return `Queue item for date ${date} must have a priority string property`;
+        }
+        if (!queueItem.addedAt || typeof queueItem.addedAt !== 'string') {
+          return `Queue item for date ${date} must have an addedAt string property`;
+        }
+      }
+      return null;
+    }
   }
 } as const;
 

@@ -10,8 +10,11 @@ export async function GET() {
     // Define the files we want to include in the download
     const filesToInclude = [
       'all-days.json',
-      'compare-data.json', 
-      'notes.json'
+      'compare-data.json',
+      'replaced-compare-data.json',
+      'notes.json',
+      'tags-definitions.json',
+      'backtest-queue.json'
     ];
 
     const zip = new JSZip();

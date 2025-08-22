@@ -5,7 +5,7 @@ import path from 'path';
 export async function POST(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const fileType = searchParams.get('fileType'); // 'all', 'all-days', 'compare-data', 'notes'
+    const fileType = searchParams.get('fileType'); // 'all', 'all-days', 'compare-data', 'replaced-compare-data', 'notes', 'tags-definitions', 'backtest-queue'
 
     if (!fileType) {
       return NextResponse.json({ error: 'File type parameter is required' }, { status: 400 });
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     
     switch (fileType) {
       case 'all':
-        filesToClear = ['all-days.json', 'compare-data.json', 'replaced-compare-data.json', 'notes.json'];
+        filesToClear = ['all-days.json', 'compare-data.json', 'replaced-compare-data.json', 'notes.json', 'tags-definitions.json', 'backtest-queue.json'];
         break;
       case 'all-days':
         filesToClear = ['all-days.json'];
@@ -32,9 +32,15 @@ export async function POST(request: NextRequest) {
       case 'notes':
         filesToClear = ['notes.json'];
         break;
+      case 'tags-definitions':
+        filesToClear = ['tags-definitions.json'];
+        break;
+      case 'backtest-queue':
+        filesToClear = ['backtest-queue.json'];
+        break;
       default:
         return NextResponse.json({ 
-          error: 'Invalid file type. Expected: all, all-days, compare-data, replaced-compare-data, or notes' 
+          error: 'Invalid file type. Expected: all, all-days, compare-data, replaced-compare-data, notes, tags-definitions, or backtest-queue' 
         }, { status: 400 });
     }
 

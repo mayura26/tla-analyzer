@@ -136,7 +136,7 @@ export const BacktestRemainingDays = forwardRef<BacktestRemainingDaysRef, Backte
     );
   };
 
-  // Group items by month for calendar view
+  // Group items by month for calendar view - only include months with pending items
   const groupedByMonth = sortedItems.reduce((acc, item) => {
     const monthKey = item.date.substring(0, 7); // YYYY-MM
     if (!acc[monthKey]) acc[monthKey] = [];
@@ -144,18 +144,26 @@ export const BacktestRemainingDays = forwardRef<BacktestRemainingDaysRef, Backte
     return acc;
   }, {} as Record<string, BacktestQueueItem[]>);
 
+  // Filter out months that only have completed items
+  const filteredGroupedByMonth = Object.entries(groupedByMonth)
+    .filter(([, items]) => items.some(item => item.status === 'pending'))
+    .reduce((acc, [monthKey, items]) => {
+      acc[monthKey] = items;
+      return acc;
+    }, {} as Record<string, BacktestQueueItem[]>);
+
   const renderCalendarView = () => {
-    if (Object.keys(groupedByMonth).length === 0) {
+    if (Object.keys(filteredGroupedByMonth).length === 0) {
       return (
         <div className="text-center py-4 text-muted-foreground text-sm">
-          No backtest items
+          No pending backtest items
         </div>
       );
     }
 
     return (
       <div className="space-y-6">
-        {Object.entries(groupedByMonth).map(([month, items]) => {
+        {Object.entries(filteredGroupedByMonth).map(([month, items]) => {
           // Parse month safely to avoid timezone issues
           const [year, monthNum] = month.split('-').map(Number);
           const monthName = new Date(year, monthNum - 1, 1).toLocaleDateString('en-US', { 
@@ -260,22 +268,22 @@ export const BacktestRemainingDays = forwardRef<BacktestRemainingDaysRef, Backte
   };
 
   const renderListView = () => {
-    if (sortedItems.length === 0) {
+    // Filter to only show pending items in list view
+    const pendingItemsForList = sortedItems.filter(item => item.status === 'pending');
+    
+    if (pendingItemsForList.length === 0) {
       return (
         <div className="text-center py-4 text-muted-foreground text-sm">
-          No backtest items
+          No pending backtest items
         </div>
       );
     }
 
     return (
       <div className="space-y-2">
-        {sortedItems.slice(0, 10).map((item) => {
-          const isCompleted = item.status === 'completed';
+        {pendingItemsForList.slice(0, 10).map((item) => {
           const baseClasses = "flex items-center justify-between p-2 rounded-lg transition-colors";
-          const statusClasses = isCompleted 
-            ? "bg-green-500/10 hover:bg-green-500/15 opacity-70" 
-            : "bg-muted/20 hover:bg-muted/30";
+          const statusClasses = "bg-muted/20 hover:bg-muted/30";
           
           return (
             <div
@@ -283,27 +291,22 @@ export const BacktestRemainingDays = forwardRef<BacktestRemainingDaysRef, Backte
               className={`${baseClasses} ${statusClasses}`}
             >
               <div className="flex items-center gap-2">
-                <Flag className={`w-3 h-3 ${isCompleted ? 'text-green-400/70' : getPriorityColor(item.priority)}`} />
-                <span className={`text-sm font-medium ${isCompleted ? 'text-green-400/80' : ''}`}>
+                <Flag className={`w-3 h-3 ${getPriorityColor(item.priority)}`} />
+                <span className="text-sm font-medium">
                   {formatDate(item.date)}
                 </span>
-                {isCompleted && (
-                  <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-400/80 border-green-500/30">
-                    ✓ Done
-                  </Badge>
-                )}
               </div>
               <div className="flex items-center gap-1">
-                {!isCompleted && getPriorityBadge(item.priority)}
+                {getPriorityBadge(item.priority)}
               </div>
             </div>
           );
         })}
         
-        {sortedItems.length > 10 && (
+        {pendingItemsForList.length > 10 && (
           <div className="text-center pt-2">
             <span className="text-xs text-muted-foreground">
-              +{sortedItems.length - 10} more days
+              +{pendingItemsForList.length - 10} more pending days
             </span>
           </div>
         )}

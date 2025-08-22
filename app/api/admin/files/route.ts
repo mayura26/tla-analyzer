@@ -11,7 +11,9 @@ export async function GET() {
       { name: 'all-days.json', description: 'Main trading data file' },
       { name: 'compare-data.json', description: 'Comparison data file' },
       { name: 'replaced-compare-data.json', description: 'Replaced comparison data file' },
-      { name: 'notes.json', description: 'All trading notes in single file' }
+      { name: 'notes.json', description: 'All trading notes in single file' },
+      { name: 'tags-definitions.json', description: 'Tag definitions and configuration' },
+      { name: 'backtest-queue.json', description: 'Backtest queue and scheduling data' }
     ];
 
     const fileInfo = [];
