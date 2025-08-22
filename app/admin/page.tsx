@@ -4,10 +4,12 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Download, Upload, FileText, Database, Loader2, Trash2, History, Eye } from "lucide-react";
+import { Download, Upload, FileText, Database, Loader2, Trash2, History, Eye, BarChart3, ChevronDown, ChevronRight, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ReplacedCompareDialog } from "@/components/ReplacedCompareDialog";
 import { TradeListEntry } from "@/lib/trading-log-parser";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface FileInfo {
   name: string;
@@ -65,6 +67,13 @@ export default function AdminPage() {
   const [isReplacedDialogOpen, setIsReplacedDialogOpen] = useState(false);
   const [currentCompareDataMap, setCurrentCompareDataMap] = useState<Map<string, CurrentCompareData>>(new Map());
   const [loadingCurrentDataMap, setLoadingCurrentDataMap] = useState<Set<string>>(new Set());
+  
+  // New state for data visualization dialog
+  const [isDataVisualizationOpen, setIsDataVisualizationOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<string>("");
+  const [fileData, setFileData] = useState<any>(null);
+  const [loadingFileData, setLoadingFileData] = useState(false);
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchFileInfo();
@@ -365,6 +374,225 @@ export default function AdminPage() {
     return value >= 0 ? 'text-green-600' : 'text-red-600';
   };
 
+  const fetchFileData = async (filename: string) => {
+    if (!filename) return;
+    
+    setLoadingFileData(true);
+    try {
+      const response = await fetch(`/api/admin/download?file=${filename}`);
+      if (response.ok) {
+        const text = await response.text();
+        try {
+          const jsonData = JSON.parse(text);
+          setFileData(jsonData);
+        } catch (parseError) {
+          // If it's not JSON, show as text
+          setFileData({ _rawText: text });
+        }
+      } else {
+        setFileData({ _error: 'Failed to load file' });
+      }
+    } catch (error) {
+      console.error('Error fetching file data:', error);
+      setFileData({ _error: 'Network error loading file' });
+    } finally {
+      setLoadingFileData(false);
+    }
+  };
+
+  const toggleNode = (path: string) => {
+    const newExpanded = new Set(expandedNodes);
+    if (newExpanded.has(path)) {
+      newExpanded.delete(path);
+    } else {
+      newExpanded.add(path);
+    }
+    setExpandedNodes(newExpanded);
+  };
+
+  const renderJsonNode = (data: any, path: string = "", level: number = 0) => {
+    if (data === null) return <span className="text-gray-500">null</span>;
+    if (data === undefined) return <span className="text-gray-500">undefined</span>;
+    
+    const isExpanded = expandedNodes.has(path);
+    
+    if (typeof data === 'object' && !Array.isArray(data)) {
+      const keys = Object.keys(data);
+      if (keys.length === 0) return <span className="text-gray-500">{"{}"}</span>;
+      
+      return (
+        <div className="ml-4">
+          <div 
+            className="flex items-center cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5"
+            onClick={() => toggleNode(path)}
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-3 w-3 mr-1" />
+            ) : (
+              <ChevronRight className="h-3 w-3 mr-1" />
+            )}
+            <span className="text-blue-600 font-medium">{"{"}</span>
+            <span className="text-gray-500 ml-1">({keys.length} keys)</span>
+          </div>
+          
+          {isExpanded && (
+            <div className="ml-4">
+              {keys.map((key, index) => (
+                <div key={key} className="py-1">
+                  <span className="text-purple-600 font-medium">"{key}":</span>
+                  {renderJsonNode(data[key], `${path}.${key}`, level + 1)}
+                  {index < keys.length - 1 && <span className="text-gray-400">,</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {isExpanded && <span className="text-blue-600 font-medium">{"}"}</span>}
+        </div>
+      );
+    }
+    
+    if (Array.isArray(data)) {
+      if (data.length === 0) return <span className="text-gray-500">{"[]"}</span>;
+      
+      return (
+        <div className="ml-4">
+          <div 
+            className="flex items-center cursor-pointer hover:bg-muted/50 rounded px-1 py-0.5"
+            onClick={() => toggleNode(path)}
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-3 w-3 mr-1" />
+            ) : (
+              <ChevronRight className="h-3 w-3 mr-1" />
+            )}
+            <span className="text-green-600 font-medium">[</span>
+            <span className="text-gray-500 ml-1">({data.length} items)</span>
+          </div>
+          
+          {isExpanded && (
+            <div className="ml-4">
+              {data.map((item, index) => (
+                <div key={index} className="py-1">
+                  {renderJsonNode(item, `${path}[${index}]`, level + 1)}
+                  {index < data.length - 1 && <span className="text-gray-400">,</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          
+          {isExpanded && <span className="text-green-600 font-medium">]</span>}
+        </div>
+      );
+    }
+    
+    if (typeof data === 'string') {
+      return <span className="text-green-600">"{data}"</span>;
+    }
+    
+    if (typeof data === 'number') {
+      const color = data >= 0 ? 'text-blue-600' : 'text-red-600';
+      return <span className={color}>{data}</span>;
+    }
+    
+    if (typeof data === 'boolean') {
+      const color = data ? 'text-green-600' : 'text-red-600';
+      return <span className={color}>{data.toString()}</span>;
+    }
+    
+    return <span className="text-gray-500">{String(data)}</span>;
+  };
+
+  const getFileStats = (data: any) => {
+    if (!data || typeof data !== 'object') return null;
+    
+    const stats: any = {
+      totalKeys: 0,
+      totalItems: 0,
+      dataTypes: new Map<string, number>(),
+      sampleValues: new Map<string, any>()
+    };
+    
+    const analyzeObject = (obj: any, path: string = "") => {
+      if (obj === null || obj === undefined) return;
+      
+      if (typeof obj === 'object' && !Array.isArray(obj)) {
+        stats.totalKeys += Object.keys(obj).length;
+        Object.entries(obj).forEach(([key, value]) => {
+          const fullPath = path ? `${path}.${key}` : key;
+          const type = Array.isArray(value) ? 'array' : typeof value;
+          stats.dataTypes.set(type, (stats.dataTypes.get(type) || 0) + 1);
+          
+          if (!stats.sampleValues.has(fullPath)) {
+            stats.sampleValues.set(fullPath, value);
+          }
+          
+          analyzeObject(value, fullPath);
+        });
+      } else if (Array.isArray(obj)) {
+        stats.totalItems += obj.length;
+        stats.dataTypes.set('array', (stats.dataTypes.get('array') || 0) + 1);
+        
+        if (obj.length > 0) {
+          analyzeObject(obj[0], `${path}[0]`);
+        }
+      }
+    };
+    
+    analyzeObject(data);
+    
+    return {
+      totalKeys: stats.totalKeys,
+      totalItems: stats.totalItems,
+      dataTypes: Object.fromEntries(stats.dataTypes),
+      sampleValues: Object.fromEntries(stats.sampleValues)
+    };
+  };
+
+  const openDataVisualization = () => {
+    setIsDataVisualizationOpen(true);
+    // Auto-select the first available file if none is selected
+    if (!selectedFile && existingFiles.length > 0) {
+      setSelectedFile(existingFiles[0].name);
+      fetchFileData(existingFiles[0].name);
+    }
+  };
+
+  const closeDataVisualization = () => {
+    setIsDataVisualizationOpen(false);
+    setSelectedFile("");
+    setFileData(null);
+    setExpandedNodes(new Set());
+  };
+
+  const expandAllNodes = (data: any, path: string = "") => {
+    const newExpanded = new Set<string>();
+    
+    const expandRecursive = (obj: any, currentPath: string) => {
+      if (obj === null || obj === undefined) return;
+      
+      if (typeof obj === 'object' && !Array.isArray(obj)) {
+        newExpanded.add(currentPath);
+        Object.entries(obj).forEach(([key, value]) => {
+          const fullPath = currentPath ? `${currentPath}.${key}` : key;
+          expandRecursive(value, fullPath);
+        });
+      } else if (Array.isArray(obj)) {
+        newExpanded.add(currentPath);
+        if (obj.length > 0) {
+          expandRecursive(obj[0], `${currentPath}[0]`);
+        }
+      }
+    };
+    
+    expandRecursive(data, path);
+    setExpandedNodes(newExpanded);
+  };
+
+  const collapseAllNodes = () => {
+    setExpandedNodes(new Set());
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -437,6 +665,23 @@ export default function AdminPage() {
               </Button>
               <p className="text-xs text-muted-foreground mt-1 text-center">
                 Downloads all available files as a ZIP archive
+              </p>
+            </div>
+
+            {/* Data Visualization Button */}
+            <div className="mb-4">
+              <Button
+                onClick={openDataVisualization}
+                disabled={existingFiles.length === 0}
+                variant="outline"
+                className="w-full"
+                size="lg"
+              >
+                <BarChart3 className="h-5 w-5 mr-2" />
+                View Data Structure
+              </Button>
+              <p className="text-xs text-muted-foreground mt-1 text-center">
+                Explore and analyze raw data files
               </p>
             </div>
 
@@ -588,7 +833,7 @@ export default function AdminPage() {
                     accept=".json"
                     onChange={(e) => handleUpload(e, "replaced-compare-data")}
                     disabled={uploading || uploadingAll}
-                    className="flex-1 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                    className="flex-1 text-sm file:mr-4 file:py-2 file:px-4 file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Will be saved as: replaced-compare-data.json</p>
@@ -898,6 +1143,139 @@ export default function AdminPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Data Visualization Dialog */}
+      <Dialog open={isDataVisualizationOpen} onOpenChange={setIsDataVisualizationOpen}>
+        <DialogContent className="max-w-[98vw] max-h-[98vh] w-[98vw] h-[98vh] overflow-hidden">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5" />
+              Data Visualization
+            </DialogTitle>
+            <DialogDescription>
+              Explore and visualize the structure and content of raw data files
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-2 overflow-hidden flex flex-col h-full">
+            {/* File Selection and Controls */}
+            <div className="space-y-3 flex-shrink-0">
+              {/* Row 1: File Selection */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Select File to Visualize</label>
+                <select
+                  value={selectedFile}
+                  onChange={(e) => {
+                    setSelectedFile(e.target.value);
+                    if (e.target.value) {
+                      fetchFileData(e.target.value);
+                    } else {
+                      setFileData(null);
+                    }
+                  }}
+                  className="w-full p-2 border rounded-md bg-background"
+                >
+                  <option value="">Choose a file...</option>
+                  {existingFiles.map((file) => (
+                    <option key={file.name} value={file.name}>
+                      {file.name} ({file.size})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Row 2: Action Buttons */}
+              {selectedFile && (
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => fetchFileData(selectedFile)}
+                    disabled={loadingFileData}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    {loadingFileData ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Eye className="h-4 w-4 mr-2" />
+                    )}
+                    {loadingFileData ? 'Loading...' : 'Refresh'}
+                  </Button>
+                  
+                  <Button
+                    onClick={() => fileData && expandAllNodes(fileData)}
+                    disabled={!fileData || loadingFileData}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                  >
+                    Expand All
+                  </Button>
+                  
+                  <Button
+                    onClick={collapseAllNodes}
+                    disabled={expandedNodes.size === 0}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                  >
+                    Collapse All
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Data Display - Takes remaining height */}
+            {selectedFile && (
+              <div className="flex-1 overflow-hidden">
+                <Tabs defaultValue="structure" className="w-full h-full flex flex-col">
+                  <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
+                    <TabsTrigger value="structure">Structure</TabsTrigger>
+                    <TabsTrigger value="data">Raw Data</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="structure" className="mt-2 flex-1 overflow-hidden">
+                    {loadingFileData ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                        Loading file structure...
+                      </div>
+                    ) : fileData ? (
+                      <div className="border rounded-lg p-4 bg-muted/20 h-full overflow-auto">
+                        <div className="font-mono text-sm">
+                          {renderJsonNode(fileData)}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        Select a file to view its structure
+                      </div>
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="data" className="mt-2 flex-1 overflow-hidden">
+                    {loadingFileData ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                        Loading file data...
+                      </div>
+                    ) : fileData ? (
+                      <div className="border rounded-lg p-4 bg-muted/20 h-full overflow-auto">
+                        <pre className="font-mono text-sm whitespace-pre-wrap">
+                          {JSON.stringify(fileData, null, 2)}
+                        </pre>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        Select a file to view its raw data
+                      </div>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Replaced Comparison Dialog */}
       <ReplacedCompareDialog
