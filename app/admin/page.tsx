@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Download, Upload, FileText, Database, Loader2, Trash2, History, Eye, BarChart3, ChevronDown, ChevronRight, X } from "lucide-react";
+import { Download, Upload, FileText, Database, Loader2, Trash2, History, Eye, BarChart3, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ReplacedCompareDialog } from "@/components/ReplacedCompareDialog";
 import { TradeListEntry } from "@/lib/trading-log-parser";
@@ -385,7 +385,7 @@ export default function AdminPage() {
         try {
           const jsonData = JSON.parse(text);
           setFileData(jsonData);
-        } catch (parseError) {
+        } catch {
           // If it's not JSON, show as text
           setFileData({ _rawText: text });
         }
@@ -503,52 +503,6 @@ export default function AdminPage() {
     return <span className="text-gray-500">{String(data)}</span>;
   };
 
-  const getFileStats = (data: any) => {
-    if (!data || typeof data !== 'object') return null;
-    
-    const stats: any = {
-      totalKeys: 0,
-      totalItems: 0,
-      dataTypes: new Map<string, number>(),
-      sampleValues: new Map<string, any>()
-    };
-    
-    const analyzeObject = (obj: any, path: string = "") => {
-      if (obj === null || obj === undefined) return;
-      
-      if (typeof obj === 'object' && !Array.isArray(obj)) {
-        stats.totalKeys += Object.keys(obj).length;
-        Object.entries(obj).forEach(([key, value]) => {
-          const fullPath = path ? `${path}.${key}` : key;
-          const type = Array.isArray(value) ? 'array' : typeof value;
-          stats.dataTypes.set(type, (stats.dataTypes.get(type) || 0) + 1);
-          
-          if (!stats.sampleValues.has(fullPath)) {
-            stats.sampleValues.set(fullPath, value);
-          }
-          
-          analyzeObject(value, fullPath);
-        });
-      } else if (Array.isArray(obj)) {
-        stats.totalItems += obj.length;
-        stats.dataTypes.set('array', (stats.dataTypes.get('array') || 0) + 1);
-        
-        if (obj.length > 0) {
-          analyzeObject(obj[0], `${path}[0]`);
-        }
-      }
-    };
-    
-    analyzeObject(data);
-    
-    return {
-      totalKeys: stats.totalKeys,
-      totalItems: stats.totalItems,
-      dataTypes: Object.fromEntries(stats.dataTypes),
-      sampleValues: Object.fromEntries(stats.sampleValues)
-    };
-  };
-
   const openDataVisualization = () => {
     setIsDataVisualizationOpen(true);
     // Auto-select the first available file if none is selected
@@ -556,13 +510,6 @@ export default function AdminPage() {
       setSelectedFile(existingFiles[0].name);
       fetchFileData(existingFiles[0].name);
     }
-  };
-
-  const closeDataVisualization = () => {
-    setIsDataVisualizationOpen(false);
-    setSelectedFile("");
-    setFileData(null);
-    setExpandedNodes(new Set());
   };
 
   const expandAllNodes = (data: any, path: string = "") => {

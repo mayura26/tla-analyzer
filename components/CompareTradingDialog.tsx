@@ -27,15 +27,13 @@ interface CompareTradingDialogProps {
 
 type SessionKey = keyof DailyStats['sessionBreakdown'];
 
-export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats, onMerge, onVerificationChange, onNotesChange }: CompareTradingDialogProps) {
+export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats, onMerge, onVerificationChange }: CompareTradingDialogProps) {
   const [isVerified, setIsVerified] = useState(false);
-  const [notes, setNotes] = useState("");
   const [tagAssignments, setTagAssignments] = useState<TagAssignment[]>([]);
   const [baseDayNotes, setBaseDayNotes] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
-  const [hasUnsavedNotes, setHasUnsavedNotes] = useState(false);
   const [markedTrades, setMarkedTrades] = useState<Set<string>>(new Set());
   const [collapsedTrades, setCollapsedTrades] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
@@ -176,7 +174,6 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
         const data = await metadataResponse.json();
         if (data.metadata) {
           setIsVerified(data.metadata.verified || false);
-          setNotes(data.metadata.notes || "");
           setTagAssignments(data.metadata.tagAssignments || []);
         }
       }
@@ -227,54 +224,11 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
     }
   };
 
-  const saveNotes = async (newNotes: string) => {
-    try {
-      setIsSaving(true);
-      const formattedDate = getFormattedDate(baseStats.date);
-      const response = await fetch('/api/trading-data/compare/manage', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'addNotes',
-          date: formattedDate,
-          notes: newNotes
-        }),
-      });
-
-      if (response.ok) {
-        toast.success("Notes saved successfully");
-      } else {
-        const error = await response.json();
-        toast.error(error.error || "Failed to save notes");
-      }
-    } catch (error) {
-      console.error('Error saving notes:', error);
-      toast.error("Failed to save notes");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleVerificationChange = async (verified: boolean) => {
     setIsVerified(verified);
     await saveVerificationStatus(verified);
     if (onVerificationChange) {
       onVerificationChange(verified);
-    }
-  };
-
-  const handleNotesChange = (newNotes: string) => {
-    setNotes(newNotes);
-    setHasUnsavedNotes(true);
-  };
-
-  const handleSaveNotes = async () => {
-    await saveNotes(notes);
-    setHasUnsavedNotes(false);
-    if (onNotesChange) {
-      onNotesChange(notes);
     }
   };
 

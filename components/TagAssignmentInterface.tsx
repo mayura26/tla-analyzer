@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Loader2, X, Plus, Tag, TrendingUp, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
 import type { TagAssignment } from '@/lib/trading-data-store';

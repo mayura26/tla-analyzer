@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { tradingDataStore, type TagAssignment } from '@/lib/trading-data-store';
+import { tradingDataStore } from '@/lib/trading-data-store';
 
 export async function GET(request: Request) {
   try {

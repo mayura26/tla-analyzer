@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { X, Eye, Clipboard } from "lucide-react";
 import { ReplacedCompareDialog } from "@/components/ReplacedCompareDialog";
 import { CompareTradingDialog } from "@/components/CompareTradingDialog";
+import { BacktestRemainingDays, type BacktestRemainingDaysRef } from "@/components/BacktestRemainingDays";
 import { DailyStats, TradeListEntry } from "@/lib/trading-log-parser";
 
 // Transform TradingLogAnalysis to DailyStats format for the compare dialog
@@ -83,6 +84,9 @@ export default function ComparePage() {
     compareStats: DailyStats & { tradeList?: TradeListEntry[] };
   } | null>(null);
   const [loadingDialogData, setLoadingDialogData] = useState<Set<string>>(new Set());
+
+  // Ref for the backtest remaining days component
+  const backtestRemainingDaysRef = useRef<BacktestRemainingDaysRef>(null);
 
   // Function to get PnL color based on value (same logic as trading card)
   const getPnlColor = (value: number) => {
@@ -427,6 +431,31 @@ export default function ComparePage() {
         setSubmissionLog(prev => [newSubmission, ...prev]);
         setLogData('');
         
+        // Auto-mark backtest queue item as completed if it exists
+        if (dataDate) {
+          const dateParts = dataDate.split('/');
+          if (dateParts.length === 3) {
+            const apiDate = `${dateParts[2]}-${dateParts[0].padStart(2, '0')}-${dateParts[1].padStart(2, '0')}`;
+            try {
+              await fetch('/api/backtest-queue', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  action: 'updateStatus',
+                  date: apiDate,
+                  status: 'completed'
+                }),
+              });
+              
+              // Refresh the remaining days component to show updated queue
+              backtestRemainingDaysRef.current?.refresh();
+            } catch (queueError) {
+              // Don't fail the whole process if queue update fails
+              console.warn('Failed to update backtest queue status:', queueError);
+            }
+          }
+        }
+        
         if (result.replaced) {
           toast.success("Comparison data updated successfully. Previous comparison was saved for review due to significant differences.");
         } else if (result.hadExistingCompare) {
@@ -445,7 +474,10 @@ export default function ComparePage() {
 
   return (
     <div className="container mx-auto p-4">
-      <Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main submission form */}
+        <div className="lg:col-span-2">
+          <Card>
         <CardHeader className="relative">
           <CardTitle>Trading Log Comparison</CardTitle>
           <Button
@@ -587,6 +619,13 @@ export default function ComparePage() {
           </div>
         </CardContent>
       </Card>
+        </div>
+
+        {/* Remaining backtest days sidebar */}
+        <div className="lg:col-span-1">
+          <BacktestRemainingDays ref={backtestRemainingDaysRef} />
+        </div>
+      </div>
       
       {/* Replaced Compare Dialog */}
       <ReplacedCompareDialog

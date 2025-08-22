@@ -8,11 +8,12 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, ChevronDown, ChevronUp, DollarSign, Target, TrendingUp, TrendingDown, EyeOff, FileText, Tag, Filter } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronUp, DollarSign, Target, TrendingUp, TrendingDown, EyeOff, Tag, Filter, Calendar } from "lucide-react";
 import { ComparisonStats } from "@/lib/trading-comparison-stats-processor";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { BacktestManager } from "@/components/BacktestManager";
 import type { TagAssignment } from "@/lib/trading-data-store";
 
 interface TagDefinition {
@@ -56,6 +57,7 @@ export default function CompareViewPage() {
   const [error, setError] = useState<string | null>(null);
   const [statsExpanded, setStatsExpanded] = useState(false);
   const [tagsExpanded, setTagsExpanded] = useState(false);
+  const [backtestExpanded, setBacktestExpanded] = useState(false);
   const [showOnlyUnverified, setShowOnlyUnverified] = useState(false);
   const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all');
 
@@ -324,6 +326,27 @@ export default function CompareViewPage() {
         </Card>
       ) : (
         <>
+          {/* Collapsible Backtest Queue Management */}
+          <Card className="mb-6">
+            <CardHeader
+              className="cursor-pointer hover:bg-muted/50 transition-colors"
+              onClick={() => setBacktestExpanded(!backtestExpanded)}
+            >
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="w-5 h-5" />
+                  Backtest Queue Management
+                </CardTitle>
+                {backtestExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+              </div>
+            </CardHeader>
+            {backtestExpanded && (
+              <CardContent>
+                <BacktestManager />
+              </CardContent>
+            )}
+          </Card>
+
           {/* Collapsible Stats Pane */}
           <Card className="mb-6">
             <CardHeader

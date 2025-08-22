@@ -35,7 +35,7 @@ async function readTagsFile(): Promise<TagDefinitionsFile> {
     await ensureDataDirectory();
     const data = await fs.readFile(TAGS_FILE_PATH, 'utf-8');
     return JSON.parse(data);
-  } catch (error) {
+  } catch {
     // Return empty structure if file doesn't exist
     return {
       tags: [],
