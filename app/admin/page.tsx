@@ -4,12 +4,13 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Download, Upload, FileText, Database, Loader2, Trash2, History, Eye, BarChart3, ChevronDown, ChevronRight } from "lucide-react";
+import { Download, Upload, FileText, Database, Loader2, Trash2, History, Eye, BarChart3, ChevronDown, ChevronRight, Tag } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ReplacedCompareDialog } from "@/components/ReplacedCompareDialog";
 import { TradeListEntry } from "@/lib/trading-log-parser";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { TagManager } from "@/components/TagManager";
 
 interface FileInfo {
   name: string;
@@ -74,6 +75,13 @@ export default function AdminPage() {
   const [fileData, setFileData] = useState<any>(null);
   const [loadingFileData, setLoadingFileData] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+
+  // Collapse states for each section
+  const [isDownloadCollapsed, setIsDownloadCollapsed] = useState(true);
+  const [isUploadCollapsed, setIsUploadCollapsed] = useState(true);
+  const [isClearCollapsed, setIsClearCollapsed] = useState(true); // Start collapsed for safety
+  const [isReplacedCollapsed, setIsReplacedCollapsed] = useState(true); // Start collapsed
+  const [isTagManagerCollapsed, setIsTagManagerCollapsed] = useState(true);
 
   useEffect(() => {
     fetchFileInfo();
@@ -572,26 +580,79 @@ export default function AdminPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Admin Panel</h1>
-        <p className="text-muted-foreground">
-          Manage raw data files for the TLA Analyzer
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Admin Panel</h1>
+            <p className="text-muted-foreground">
+              Manage raw data files for the TLA Analyzer
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsDownloadCollapsed(false);
+                setIsUploadCollapsed(false);
+                setIsClearCollapsed(false);
+                setIsReplacedCollapsed(false);
+                setIsTagManagerCollapsed(false);
+              }}
+              className="gap-2"
+            >
+              <ChevronDown className="h-4 w-4" />
+              Expand All
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsDownloadCollapsed(true);
+                setIsUploadCollapsed(true);
+                setIsClearCollapsed(true);
+                setIsReplacedCollapsed(true);
+                setIsTagManagerCollapsed(true);
+              }}
+              className="gap-2"
+            >
+              <ChevronRight className="h-4 w-4" />
+              Collapse All
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Download Section */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Download className="h-5 w-5" />
-              Download Data Files
-            </CardTitle>
-            <CardDescription>
-              Download raw data files from the server
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Download className="h-5 w-5" />
+                <div>
+                  <CardTitle>Download Data Files</CardTitle>
+                  <CardDescription>
+                    Download raw data files from the server
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsDownloadCollapsed(!isDownloadCollapsed)}
+                className="p-2"
+              >
+                {isDownloadCollapsed ? (
+                  <ChevronRight className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Download All Button */}
+          {!isDownloadCollapsed && (
+            <CardContent className="space-y-4">
+              {/* Download All Button */}
             <div className="mb-4">
               <Button
                 onClick={handleDownloadAll}
@@ -737,21 +798,38 @@ export default function AdminPage() {
                 ))}
               </div>
             </div>
-          </CardContent>
+          </CardContent>)}
         </Card>
 
         {/* Upload Section */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />
-              Upload Data Files
-            </CardTitle>
-            <CardDescription>
-              Upload new data files to replace existing ones
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Upload className="h-5 w-5" />
+                <div>
+                  <CardTitle>Upload Data Files</CardTitle>
+                  <CardDescription>
+                    Upload new data files to replace existing ones
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsUploadCollapsed(!isUploadCollapsed)}
+                className="p-2"
+              >
+                {isUploadCollapsed ? (
+                  <ChevronRight className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          {!isUploadCollapsed && (
+            <CardContent className="space-y-4">
             <div className="space-y-4">
               {/* Upload All Button */}
               <div className="mb-4">
@@ -895,21 +973,38 @@ export default function AdminPage() {
                 </ul>
               </div>
             </div>
-          </CardContent>
+          </CardContent>)}
         </Card>
 
         {/* Clear Section */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5" />
-              Clear Data Files
-            </CardTitle>
-            <CardDescription>
-              Clear data files from the server (backups are created automatically)
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Trash2 className="h-5 w-5" />
+                <div>
+                  <CardTitle>Clear Data Files</CardTitle>
+                  <CardDescription>
+                    Clear data files from the server (backups are created automatically)
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsClearCollapsed(!isClearCollapsed)}
+                className="p-2"
+              >
+                {isClearCollapsed ? (
+                  <ChevronRight className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          {!isClearCollapsed && (
+            <CardContent className="space-y-4">
             <div className="space-y-3">
               <div>
                 <h3 className="font-semibold mb-2 flex items-center gap-2">
@@ -1033,21 +1128,38 @@ export default function AdminPage() {
                 </ul>
               </div>
             </div>
-          </CardContent>
+          </CardContent>)}
         </Card>
 
         {/* Replaced Comparison Data Section */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
-              Replaced Comparison Data
-            </CardTitle>
-            <CardDescription>
-              View comparison data that was replaced due to significant differences
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <History className="h-5 w-5" />
+                <div>
+                  <CardTitle>Replaced Comparison Data</CardTitle>
+                  <CardDescription>
+                    View comparison data that was replaced due to significant differences
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsReplacedCollapsed(!isReplacedCollapsed)}
+                className="p-2"
+              >
+                {isReplacedCollapsed ? (
+                  <ChevronRight className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          {!isReplacedCollapsed && (
+            <CardContent className="space-y-4">
             {loadingReplacedData ? (
               <div className="flex items-center justify-center py-8">
                 <div className="flex items-center gap-2">
@@ -1179,7 +1291,43 @@ export default function AdminPage() {
                 </div>
               </div>
             )}
-          </CardContent>
+          </CardContent>)}
+        </Card>
+      </div>
+
+      {/* Tag Management Section */}
+      <div className="mt-6">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Tag className="h-5 w-5" />
+                <div>
+                  <CardTitle>Tag Management</CardTitle>
+                  <CardDescription>
+                    Create, edit, and delete tags for categorizing trading data
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsTagManagerCollapsed(!isTagManagerCollapsed)}
+                className="p-2"
+              >
+                {isTagManagerCollapsed ? (
+                  <ChevronRight className="h-4 w-4" />
+                ) : (
+                  <ChevronDown className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          {!isTagManagerCollapsed && (
+            <CardContent>
+              <TagManager />
+            </CardContent>
+          )}
         </Card>
       </div>
 

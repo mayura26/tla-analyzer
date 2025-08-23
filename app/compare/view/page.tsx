@@ -58,6 +58,7 @@ export default function CompareViewPage() {
   const [statsExpanded, setStatsExpanded] = useState(false);
   const [tagsExpanded, setTagsExpanded] = useState(false);
   const [backtestExpanded, setBacktestExpanded] = useState(false);
+  const [tagAnalyticsExpanded, setTagAnalyticsExpanded] = useState(false);
   const [showOnlyUnverified, setShowOnlyUnverified] = useState(false);
   const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all');
 
@@ -646,55 +647,63 @@ export default function CompareViewPage() {
           {/* Tag Analytics */}
           {tagAnalytics.length > 0 && (
             <Card className="mb-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Tag className="w-5 h-5" />
-                  Tag Performance Analytics
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {tagAnalytics.map((analytic) => (
-                    <div key={analytic.tagId} className={`p-4 rounded-lg border ${
-                      analytic.totalPnlImpact >= 0 ? 'border-green-500/30 bg-green-500/10' : 'border-red-500/30 bg-red-500/10'
-                    }`}>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <div 
-                            className="w-3 h-3 rounded-full" 
-                            style={{ backgroundColor: analytic.tag.color }}
-                          />
-                          <span className="font-medium text-sm">{analytic.tag.name}</span>
-                        </div>
-                        <div className={`flex items-center gap-1 ${getPnlColor(analytic.totalPnlImpact)}`}>
-                          {getPnlIcon(analytic.totalPnlImpact)}
-                          <span className="font-bold text-sm">{formatCurrency(analytic.totalPnlImpact)}</span>
-                        </div>
-                      </div>
-                      <div className="space-y-1 text-xs text-muted-foreground">
-                        <div className="flex justify-between">
-                          <span>Total days:</span>
-                          <span className="font-medium">{analytic.totalDays}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Positive impact:</span>
-                          <span className="font-medium text-green-600">{analytic.positiveDays}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Negative impact:</span>
-                          <span className="font-medium text-red-600">{analytic.negativeDays}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Avg per day:</span>
-                          <span className={`font-medium ${getPnlColor(analytic.avgPnlImpact)}`}>
-                            {formatCurrency(analytic.avgPnlImpact)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+              <CardHeader
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => setTagAnalyticsExpanded(!tagAnalyticsExpanded)}
+              >
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Tag className="w-5 h-5" />
+                    Tag Performance Analytics
+                  </CardTitle>
+                  {tagAnalyticsExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                 </div>
-              </CardContent>
+              </CardHeader>
+              {tagAnalyticsExpanded && (
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {tagAnalytics.map((analytic) => (
+                      <div key={analytic.tagId} className={`p-4 rounded-lg border ${
+                        analytic.totalPnlImpact >= 0 ? 'border-green-500/30 bg-green-500/10' : 'border-red-500/30 bg-red-500/10'
+                      }`}>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full" 
+                              style={{ backgroundColor: analytic.tag.color }}
+                            />
+                            <span className="font-medium text-sm">{analytic.tag.name}</span>
+                          </div>
+                          <div className={`flex items-center gap-1 ${getPnlColor(analytic.totalPnlImpact)}`}>
+                            {getPnlIcon(analytic.totalPnlImpact)}
+                            <span className="font-bold text-sm">{formatCurrency(analytic.totalPnlImpact)}</span>
+                          </div>
+                        </div>
+                        <div className="space-y-1 text-xs text-muted-foreground">
+                          <div className="flex justify-between">
+                            <span>Total days:</span>
+                            <span className="font-medium">{analytic.totalDays}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Positive impact:</span>
+                            <span className="font-medium text-green-600">{analytic.positiveDays}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Negative impact:</span>
+                            <span className="font-medium text-red-600">{analytic.negativeDays}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Avg per day:</span>
+                            <span className={`font-medium ${getPnlColor(analytic.avgPnlImpact)}`}>
+                              {formatCurrency(analytic.avgPnlImpact)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              )}
             </Card>
           )}
 
