@@ -483,6 +483,9 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
 
     // Find PnL change if it exists
     const pnlChange = changes.find(change => change.field === 'totalPnl');
+    
+    // Find entry price change if it exists
+    const entryPriceChange = changes.find(change => change.field === 'entryPrice');
 
     // Check if this trade is marked and collapsed
     const tradeKey = getTradeKey(trade);
@@ -553,6 +556,22 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
                   ∑ {formatCurrency(trade.totalPnl)}
                 </Badge>
               )}
+              <Badge variant="outline" className="text-xs">
+                {entryPriceChange ? (
+                  <span>
+                    {trade.entryPrice} 
+                    <span className={`ml-1 ${
+                      trade.direction === 'LONG' 
+                        ? (entryPriceChange.newValue > entryPriceChange.oldValue ? 'text-green-500' : 'text-red-500')
+                        : (entryPriceChange.newValue < entryPriceChange.oldValue ? 'text-green-500' : 'text-red-500')
+                    }`}>
+                      ({entryPriceChange.newValue > entryPriceChange.oldValue ? '+' : ''}{formatCurrency(entryPriceChange.newValue - entryPriceChange.oldValue)})
+                    </span>
+                  </span>
+                ) : (
+                  trade.entryPrice
+                )}
+              </Badge>
             </div>
           </div>
         </div>
@@ -624,7 +643,22 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
                 {formatCurrency(trade.totalPnl)}
               </Badge>
             )}
-            <Badge variant="outline" className="text-xs">{trade.entryPrice}</Badge>
+            <Badge variant="outline" className="text-xs">
+              {entryPriceChange ? (
+                <span>
+                  {trade.entryPrice} 
+                  <span className={`ml-1 ${
+                    trade.direction === 'LONG' 
+                      ? (entryPriceChange.newValue > entryPriceChange.oldValue ? 'text-green-500' : 'text-red-500')
+                      : (entryPriceChange.newValue < entryPriceChange.oldValue ? 'text-green-500' : 'text-red-500')
+                  }`}>
+                    ({entryPriceChange.newValue > entryPriceChange.oldValue ? '+' : ''}{formatCurrency(entryPriceChange.newValue - entryPriceChange.oldValue)})
+                  </span>
+                </span>
+              ) : (
+                trade.entryPrice
+              )}
+            </Badge>
           </div>
         </div>
 
@@ -768,7 +802,7 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
           <div className="mt-2 pt-2 border-t">
             <div className="text-xs text-muted-foreground">Changes:</div>
             <div className="grid grid-cols-2 gap-2 mt-1">
-              {filteredChanges.map((change, index) => {
+              {filteredChanges.filter(change => change.field !== 'id' && change.field !== 'totalPnl').map((change, index) => {
                 // Helper to check if a value is a date or date string
                 const isDateLike = (val: any) => {
                   if (val instanceof Date) return true;
@@ -818,6 +852,15 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
                         ? formatToTime(change.newValue)
                         : String(change.newValue)}
                     </span>
+                    {change.field === 'entryPrice' && (
+                      <span className={`ml-2 ${
+                        trade.direction === 'LONG' 
+                          ? (change.newValue > change.oldValue ? 'text-green-500' : 'text-red-500')
+                          : (change.newValue < change.oldValue ? 'text-green-500' : 'text-red-500')
+                      }`}>
+                        ({change.newValue > change.oldValue ? '+' : ''}{formatCurrency(change.newValue - change.oldValue)})
+                      </span>
+                    )}
                   </div>
                 );
               })}
