@@ -36,6 +36,7 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
   const [isMerging, setIsMerging] = useState(false);
   const [markedTrades, setMarkedTrades] = useState<Set<string>>(new Set());
   const [collapsedTrades, setCollapsedTrades] = useState<Set<string>>(new Set());
+  const [expandedFillDetails, setExpandedFillDetails] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Helper function to generate a unique key for a trade
@@ -84,11 +85,27 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
     });
   };
 
+  // Toggle fill details expansion state
+  const toggleFillDetailsExpansion = (trade: TradeListEntry, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent triggering the parent click
+    const tradeKey = getTradeKey(trade);
+    setExpandedFillDetails(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(tradeKey)) {
+        newSet.delete(tradeKey);
+      } else {
+        newSet.add(tradeKey);
+      }
+      return newSet;
+    });
+  };
+
   // Clear all markings when dialog opens
   useEffect(() => {
     if (isOpen) {
       setMarkedTrades(new Set());
       setCollapsedTrades(new Set());
+      setExpandedFillDetails(new Set());
     }
   }, [isOpen]);
 
@@ -642,21 +659,109 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
           </div>
         )}
 
-        {/* Trade Fill Details - Predictive Reversal Only */}
-        {trade.isPredictiveReversal === true && (
-          <div className="mt-2 pt-2 border-t border-muted-foreground/20">
-            <div className="text-xs text-muted-foreground mb-1">Fill Details:</div>
-            <div className="flex items-center gap-1 text-xs">
-              <span className="text-muted-foreground">Predictive:</span>
-              <Badge 
-                variant="outline" 
-                className="text-xs bg-blue-400/20 text-blue-400 border-blue-400/30"
-              >
-                Reversal
-              </Badge>
+        {/* Trade Fill Details */}
+        {(trade.isPredictiveReversal !== undefined || trade.atr !== undefined || trade.barHigh !== undefined || trade.barLow !== undefined || trade.volumeTradeLength !== undefined || trade.fillDistance !== undefined) && (() => {
+          const tradeKey = getTradeKey(trade);
+          const isExpanded = expandedFillDetails.has(tradeKey);
+          const hasAdditionalDetails = trade.atr !== undefined || trade.barHigh !== undefined || trade.barLow !== undefined || trade.volumeTradeLength !== undefined || trade.fillDistance !== undefined;
+          
+          return (
+            <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-xs text-muted-foreground">Fill Details:</div>
+                {hasAdditionalDetails && (
+                  <button
+                    onClick={(e) => toggleFillDetailsExpansion(trade, e)}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted/40"
+                    title={isExpanded ? "Hide additional details" : "Show additional details"}
+                  >
+                    <span className="text-xs">More</span>
+                    {isExpanded ? (
+                      <ChevronDown className="w-3 h-3" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3" />
+                    )}
+                  </button>
+                )}
+              </div>
+              
+              <div className="space-y-1">
+                {/* Always visible: Predictive Reversal */}
+                {trade.isPredictiveReversal !== undefined && (
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="text-muted-foreground">Predictive:</span>
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs ${
+                        trade.isPredictiveReversal 
+                          ? 'bg-blue-400/20 text-blue-400 border-blue-400/30'
+                          : 'bg-gray-400/20 text-gray-400 border-gray-400/30'
+                      }`}
+                    >
+                      {trade.isPredictiveReversal ? 'Reversal' : 'Standard'}
+                    </Badge>
+                  </div>
+                )}
+                
+                {/* Collapsible: Additional Details */}
+                {isExpanded && (
+                  <>
+                    {/* ATR */}
+                    {trade.atr !== undefined && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">ATR:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {trade.atr.toFixed(1)}
+                        </Badge>
+                      </div>
+                    )}
+                    
+                    {/* Bar High/Low Information */}
+                    {(trade.barHigh !== undefined || trade.barLow !== undefined) && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">
+                          {trade.barHigh !== undefined ? 'Bar High:' : 'Bar Low:'}
+                        </span>
+                        <Badge variant="outline" className="text-xs">
+                          {trade.barHigh !== undefined ? trade.barHigh : trade.barLow}
+                        </Badge>
+                        {((trade.barHigh !== undefined && trade.barHighDistance !== undefined) || 
+                          (trade.barLow !== undefined && trade.barLowDistance !== undefined)) && (
+                          <>
+                            <span className="text-muted-foreground">Distance:</span>
+                            <Badge variant="outline" className="text-xs">
+                              {trade.barHigh !== undefined ? trade.barHighDistance?.toFixed(2) : trade.barLowDistance?.toFixed(2)}
+                            </Badge>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Volume Trade Length */}
+                    {trade.volumeTradeLength !== undefined && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">Vol Trade Length:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {trade.volumeTradeLength}
+                        </Badge>
+                      </div>
+                    )}
+                    
+                    {/* Fill Distance */}
+                    {trade.fillDistance !== undefined && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">Fill Distance:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {trade.fillDistance.toFixed(2)}
+                        </Badge>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {isModified && (filteredChanges.length > 0 || subTradeComparison) && (
           <div className="mt-2 pt-2 border-t">

@@ -96,10 +96,13 @@ export interface TradeListEntry {
   isChaseTrade: boolean;
   // New fields for detailed trade fill information
   barHigh?: number;
+  barLow?: number;
   barHighDistance?: number;
+  barLowDistance?: number;
   volumeTradeLength?: number;
   fillDistance?: number;
   isPredictiveReversal?: boolean;
+  atr?: number;
 }
 
 export interface ExpandedDailyStats extends Omit<DailyStats, 
@@ -330,12 +333,48 @@ export function parseTradingLog(logData: string): TradingLogAnalysis {
       };
 
       // Check if this is a detailed trade fill with additional information
-      const detailedFillMatch = line.match(/\[TRADE FILL \(ID: (\d+)\)\] (LONG|SHORT) FILLED: ([\d.]+) \| Bar High: ([\d.]+)\(([\d.]+)\) \| Vol Trade Length: (\d+) \| Fill Distance: ([\d.]+) \| Predictive Reversal: (True|False)/);
-      if (detailedFillMatch) {
-        trade.isPredictiveReversal = detailedFillMatch[8] === 'True';
+      // Try to match the new format with ATR first
+      const detailedFillWithATRMatch = line.match(/\[TRADE FILL \(ID: (\d+)\)\] (LONG|SHORT) FILLED: ([\d.]+) \| Bar (High|Low): ([\d.]+)\(([\d.]+)\) \| Vol Trade Length: (\d+) \| Fill Distance: ([\d.]+) \| Predictive Reversal: (True|False) \| ATR: ([\d.]+)/);
+      if (detailedFillWithATRMatch) {
+        const barType = detailedFillWithATRMatch[4]; // "High" or "Low"
+        const barPrice = parseFloat(detailedFillWithATRMatch[5]);
+        const barDistance = parseFloat(detailedFillWithATRMatch[6]);
+        
+        if (barType === 'High') {
+          trade.barHigh = barPrice;
+          trade.barHighDistance = barDistance;
+        } else {
+          trade.barLow = barPrice;
+          trade.barLowDistance = barDistance;
+        }
+        
+        trade.volumeTradeLength = parseInt(detailedFillWithATRMatch[7]);
+        trade.fillDistance = parseFloat(detailedFillWithATRMatch[8]);
+        trade.isPredictiveReversal = detailedFillWithATRMatch[9] === 'True';
+        trade.atr = parseFloat(detailedFillWithATRMatch[10]);
       } else {
-        // For old data without the detailed fields, assume not a predictive reversal trade
-        trade.isPredictiveReversal = false;
+        // Try the old format without ATR
+        const detailedFillMatch = line.match(/\[TRADE FILL \(ID: (\d+)\)\] (LONG|SHORT) FILLED: ([\d.]+) \| Bar (High|Low): ([\d.]+)\(([\d.]+)\) \| Vol Trade Length: (\d+) \| Fill Distance: ([\d.]+) \| Predictive Reversal: (True|False)/);
+        if (detailedFillMatch) {
+          const barType = detailedFillMatch[4]; // "High" or "Low"
+          const barPrice = parseFloat(detailedFillMatch[5]);
+          const barDistance = parseFloat(detailedFillMatch[6]);
+          
+          if (barType === 'High') {
+            trade.barHigh = barPrice;
+            trade.barHighDistance = barDistance;
+          } else {
+            trade.barLow = barPrice;
+            trade.barLowDistance = barDistance;
+          }
+          
+          trade.volumeTradeLength = parseInt(detailedFillMatch[7]);
+          trade.fillDistance = parseFloat(detailedFillMatch[8]);
+          trade.isPredictiveReversal = detailedFillMatch[9] === 'True';
+        } else {
+          // For old data without the detailed fields, assume not a predictive reversal trade
+          trade.isPredictiveReversal = false;
+        }
       }
 
       tradeMap[id] = trade;

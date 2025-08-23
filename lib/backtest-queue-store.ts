@@ -165,8 +165,9 @@ class BacktestQueueStore {
     const queueFile = await this.readQueueFile();
     const item = queueFile.items[date];
     
+    // If item doesn't exist, silently return without error
     if (!item) {
-      throw new Error(`No queue item found for date: ${date}`);
+      return;
     }
 
     item.status = status;
@@ -197,8 +198,9 @@ class BacktestQueueStore {
     const queueFile = await this.readQueueFile();
     const item = queueFile.items[date];
     
+    // If item doesn't exist, silently return without error
     if (!item) {
-      throw new Error(`No queue item found for date: ${date}`);
+      return;
     }
 
     item.priority = priority;
@@ -209,8 +211,9 @@ class BacktestQueueStore {
     const queueFile = await this.readQueueFile();
     const item = queueFile.items[date];
     
+    // If item doesn't exist, silently return without error
     if (!item) {
-      throw new Error(`No queue item found for date: ${date}`);
+      return;
     }
 
     item.notes = notes;
