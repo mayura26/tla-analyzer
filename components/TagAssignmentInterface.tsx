@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, X, Plus, Tag, TrendingUp, TrendingDown } from 'lucide-react';
+import { Loader2, X, Plus, TrendingUp, TrendingDown } from 'lucide-react';
 import { toast } from 'sonner';
+import { TagSelector } from './TagSelector';
 import type { TagAssignment } from '@/lib/trading-data-store';
 
 export interface TagDefinition {
@@ -34,7 +34,6 @@ export function TagAssignmentInterface({
   const [tagAssignments, setTagAssignments] = useState<TagAssignment[]>(initialTagAssignments);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [newTagName, setNewTagName] = useState('');
   const [isAddingTag, setIsAddingTag] = useState(false);
 
   // Load tag definitions on mount
@@ -125,30 +124,16 @@ export function TagAssignmentInterface({
     }
   };
 
-  const handleAddTag = async () => {
-    if (!newTagName.trim()) return;
-
-    // Check if tag already exists
-    let tagToAssign: TagDefinition | null = tagDefinitions.find(tag => 
-      tag.name.toLowerCase() === newTagName.trim().toLowerCase()
-    ) || null;
-
-    // Create new tag if it doesn't exist
-    if (!tagToAssign) {
-      tagToAssign = await createNewTag(newTagName.trim());
-      if (!tagToAssign) return;
-    }
-
+  const handleTagSelect = async (tagId: string) => {
     // Check if tag is already assigned
-    if (tagAssignments.some(assignment => assignment.tagId === tagToAssign!.id)) {
+    if (tagAssignments.some(assignment => assignment.tagId === tagId)) {
       toast.error('This tag is already assigned to this day');
-      setNewTagName('');
       return;
     }
 
     // Add assignment with default positive impact
     const newAssignment: TagAssignment = {
-      tagId: tagToAssign.id,
+      tagId: tagId,
       impact: 'positive',
       assignedAt: new Date().toISOString()
     };
@@ -159,7 +144,6 @@ export function TagAssignmentInterface({
     const saveSuccess = await saveTagAssignments(updatedAssignments);
     if (saveSuccess) {
       setTagAssignments(updatedAssignments);
-      setNewTagName('');
       setIsAddingTag(false);
     }
   };
@@ -194,14 +178,9 @@ export function TagAssignmentInterface({
     return tagDefinitions.find(tag => tag.id === tagId);
   };
 
-  const getAvailableTags = () => {
-    const assignedTagIds = tagAssignments.map(assignment => assignment.tagId);
-    return tagDefinitions.filter(tag => !assignedTagIds.includes(tag.id));
+  const getAssignedTagIds = () => {
+    return tagAssignments.map(assignment => assignment.tagId);
   };
-
-  const filteredAvailableTags = getAvailableTags().filter(tag =>
-    newTagName === '' || tag.name.toLowerCase().includes(newTagName.toLowerCase())
-  );
 
   return (
     <div className="space-y-4">
@@ -268,73 +247,22 @@ export function TagAssignmentInterface({
         </Button>
       ) : (
         <div className="space-y-3 p-3 border rounded-lg bg-muted/20">
-          <div className="flex items-center gap-2">
-            <Input
-              placeholder="Enter tag name or select existing..."
-              value={newTagName}
-              onChange={(e) => setNewTagName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  handleAddTag();
-                } else if (e.key === 'Escape') {
-                  setNewTagName('');
-                  setIsAddingTag(false);
-                }
-              }}
-              disabled={disabled}
-              autoFocus
-            />
-          </div>
-          
-          {/* Available Tags Suggestions */}
-          {newTagName && filteredAvailableTags.length > 0 && (
-            <div className="space-y-1">
-              <div className="text-xs text-muted-foreground">Existing tags:</div>
-              <div className="flex flex-wrap gap-1">
-                {filteredAvailableTags.slice(0, 5).map((tag) => (
-                  <Button
-                    key={tag.id}
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                    onClick={() => setNewTagName(tag.name)}
-                    style={{ color: tag.color }}
-                  >
-                    <Tag className="w-3 h-3 mr-1" />
-                    {tag.name}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-xs text-muted-foreground">
-              {filteredAvailableTags.find(tag => tag.name.toLowerCase() === newTagName.toLowerCase()) 
-                ? 'Select existing tag' 
-                : newTagName ? 'Create new tag' 
-                : 'Enter tag name'}
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setNewTagName('');
-                  setIsAddingTag(false);
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleAddTag}
-                disabled={!newTagName.trim()}
-              >
-                Add
-              </Button>
-            </div>
+          <TagSelector
+            tags={tagDefinitions}
+            selectedTags={getAssignedTagIds()}
+            onTagSelect={handleTagSelect}
+            onTagCreate={createNewTag}
+            disabled={disabled}
+            placeholder="Select or create a tag..."
+          />
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsAddingTag(false)}
+            >
+              Cancel
+            </Button>
           </div>
         </div>
       )}

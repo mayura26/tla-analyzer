@@ -154,6 +154,43 @@ export async function POST(request: Request) {
   }
 }
 
+// PUT /api/trading-data/tags - Update tag usage statistics
+export async function PUT(request: Request) {
+  try {
+    const { tagIds } = await request.json();
+    
+    if (!Array.isArray(tagIds) || tagIds.length === 0) {
+      return NextResponse.json(
+        { error: 'Tag IDs array is required' },
+        { status: 400 }
+      );
+    }
+
+    const tagsData = await readTagsFile();
+    const now = new Date().toISOString();
+    
+    // Update usage statistics for the provided tag IDs
+    tagIds.forEach((tagId: string) => {
+      const tagIndex = tagsData.tags.findIndex(tag => tag.id === tagId);
+      if (tagIndex >= 0) {
+        tagsData.tags[tagIndex].usageCount = (tagsData.tags[tagIndex].usageCount || 0) + 1;
+        tagsData.tags[tagIndex].lastUsed = now;
+      }
+    });
+    
+    tagsData.lastUpdated = now;
+    await writeTagsFile(tagsData);
+    
+    return NextResponse.json({ success: true, updatedTags: tagIds.length });
+  } catch (error) {
+    console.error("Error in tags PUT:", error);
+    return NextResponse.json(
+      { error: "Failed to update tag usage statistics" },
+      { status: 500 }
+    );
+  }
+}
+
 // DELETE /api/trading-data/tags - Delete a tag
 export async function DELETE(request: Request) {
   try {

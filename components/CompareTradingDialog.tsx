@@ -36,6 +36,7 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
   const [isMerging, setIsMerging] = useState(false);
   const [markedTrades, setMarkedTrades] = useState<Set<string>>(new Set());
   const [collapsedTrades, setCollapsedTrades] = useState<Set<string>>(new Set());
+
   const [expandedFillDetails, setExpandedFillDetails] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
 

@@ -185,6 +185,22 @@ export async function POST(request: Request) {
             { status: 404 }
           );
         }
+
+        // Update tag usage statistics
+        if (tagAssignments.length > 0) {
+          try {
+            const tagIds = tagAssignments.map((assignment: any) => assignment.tagId);
+            await fetch(new URL('/api/trading-data/tags', request.url), {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tagIds })
+            });
+          } catch (error) {
+            console.error('Failed to update tag usage statistics:', error);
+            // Don't fail the main operation if usage tracking fails
+          }
+        }
+
         return NextResponse.json({ 
           success: true, 
           message: 'Tag assignments updated for compare data',
