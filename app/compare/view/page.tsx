@@ -661,42 +661,43 @@ export default function CompareViewPage() {
               </CardHeader>
               {tagAnalyticsExpanded && (
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                     {tagAnalytics.map((analytic) => (
-                      <div key={analytic.tagId} className={`p-4 rounded-lg border ${
+                      <div key={analytic.tagId} className={`p-1.5 rounded-lg border ${
                         analytic.totalPnlImpact >= 0 ? 'border-green-500/30 bg-green-500/10' : 'border-red-500/30 bg-red-500/10'
                       }`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
+                        <div className="flex items-start justify-between mb-1">
+                          <div className="flex items-center gap-1">
                             <div 
-                              className="w-3 h-3 rounded-full" 
+                              className="w-2 h-2 rounded-full flex-shrink-0" 
                               style={{ backgroundColor: analytic.tag.color }}
                             />
-                            <span className="font-medium text-sm">{analytic.tag.name}</span>
+                            <span className="font-medium text-xs truncate">{analytic.tag.name}</span>
                           </div>
-                          <div className={`flex items-center gap-1 ${getPnlColor(analytic.totalPnlImpact)}`}>
+                          <div className={`${getPnlColor(analytic.totalPnlImpact)}`}>
                             {getPnlIcon(analytic.totalPnlImpact)}
-                            <span className="font-bold text-sm">{formatCurrency(analytic.totalPnlImpact)}</span>
                           </div>
                         </div>
-                        <div className="space-y-1 text-xs text-muted-foreground">
+                        <div className="space-y-0.5 text-xs">
                           <div className="flex justify-between">
-                            <span>Total days:</span>
-                            <span className="font-medium">{analytic.totalDays}</span>
+                            <span className="text-muted-foreground">Total:</span>
+                            <span className={`font-medium ${getPnlColor(analytic.totalPnlImpact)}`}>
+                              {formatCurrency(analytic.totalPnlImpact)}
+                            </span>
                           </div>
                           <div className="flex justify-between">
-                            <span>Positive impact:</span>
-                            <span className="font-medium text-green-600">{analytic.positiveDays}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Negative impact:</span>
-                            <span className="font-medium text-red-600">{analytic.negativeDays}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span>Avg per day:</span>
+                            <span className="text-muted-foreground">Avg:</span>
                             <span className={`font-medium ${getPnlColor(analytic.avgPnlImpact)}`}>
                               {formatCurrency(analytic.avgPnlImpact)}
                             </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-green-600">+:</span>
+                            <span className="font-medium text-green-600">{analytic.positiveDays}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-red-600">-:</span>
+                            <span className="font-medium text-red-600">{analytic.negativeDays}</span>
                           </div>
                         </div>
                       </div>
