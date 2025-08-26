@@ -3,12 +3,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { TradeListEntry } from "@/lib/trading-log-parser";
 import { format, parseISO } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
-import { Loader2, Trash2, CheckCircle2, ChevronDown, ChevronRight, ArrowRight, FileText } from "lucide-react";
+import { Loader2, Trash2, CheckCircle2, ChevronDown, ChevronRight, ArrowRight, FileText, Tag, TrendingUp, TrendingDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { compareTradingLogs } from "@/lib/trading-log-comparator";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 interface ReplacedCompareData {
   date: string;
@@ -27,6 +28,11 @@ interface ReplacedCompareData {
     originalDate?: string;
     addedAt?: string;
     notes?: string;
+    tagAssignments?: Array<{
+      tagId: string;
+      impact: 'positive' | 'negative';
+      assignedAt: string;
+    }>;
   };
 }
 
@@ -43,6 +49,11 @@ interface CurrentCompareData {
   };
   metadata?: {
     notes?: string;
+    tagAssignments?: Array<{
+      tagId: string;
+      impact: 'positive' | 'negative';
+      assignedAt: string;
+    }>;
   };
 }
 
@@ -51,6 +62,16 @@ interface ReplacedCompareDialogProps {
   onClose: () => void;
   replacedData: ReplacedCompareData | null;
   onDelete?: () => void;
+}
+
+interface TagDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  createdAt: string;
+  lastUsed?: string;
+  usageCount: number;
 }
 
 export function ReplacedCompareDialog({ 
@@ -66,6 +87,8 @@ export function ReplacedCompareDialog({
   const [loadingCurrentData, setLoadingCurrentData] = useState(false);
   const [baseNotes, setBaseNotes] = useState<string>("");
   const [loadingNotes, setLoadingNotes] = useState(false);
+  const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
+  const [loadingTags, setLoadingTags] = useState(false);
 
   // Helper function to generate a unique key for a trade
   const getTradeKey = (trade: TradeListEntry) => {
@@ -77,6 +100,7 @@ export function ReplacedCompareDialog({
     if (isOpen && replacedData) {
       fetchCurrentCompareData();
       fetchNotes();
+      fetchTagDefinitions();
     }
   }, [isOpen, replacedData]);
 
@@ -122,6 +146,103 @@ export function ReplacedCompareDialog({
     } finally {
       setLoadingNotes(false);
     }
+  };
+
+  // Fetch tag definitions when dialog opens
+  React.useEffect(() => {
+    if (isOpen && replacedData) {
+      fetchCurrentCompareData();
+      fetchNotes();
+      fetchTagDefinitions();
+    }
+  }, [isOpen, replacedData]);
+
+
+
+  const fetchTagDefinitions = async () => {
+    try {
+      setLoadingTags(true);
+      const response = await fetch('/api/trading-data/tags');
+      if (response.ok) {
+        const tags = await response.json();
+        setTagDefinitions(tags);
+      } else {
+        console.error('Failed to load tag definitions');
+      }
+    } catch (error) {
+      console.error('Error fetching tag definitions:', error);
+    } finally {
+      setLoadingTags(false);
+    }
+  };
+
+  // Helper function to get tag definition by ID
+  const getTagDefinition = (tagId: string): TagDefinition | undefined => {
+    return tagDefinitions.find(tag => tag.id === tagId);
+  };
+
+  // Helper function to render tag assignments
+  const renderTagAssignments = (tagAssignments: any[]) => {
+    if (!tagAssignments || tagAssignments.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap gap-2">
+        {tagAssignments.map((assignment) => {
+          const tagDef = getTagDefinition(assignment.tagId);
+          
+          if (!tagDef) {
+            return null;
+          }
+          
+          return (
+            <HoverCard key={assignment.tagId}>
+              <HoverCardTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className="flex items-center gap-1 cursor-help"
+                  style={{ 
+                    borderColor: tagDef.color + '40', 
+                    backgroundColor: tagDef.color + '10' 
+                  }}
+                >
+                  <Tag className="w-3 h-3" style={{ color: tagDef.color }} />
+                  <span style={{ color: tagDef.color }}>{tagDef.name}</span>
+                  {assignment.impact === 'positive' ? (
+                    <TrendingUp className="w-3 h-3 text-green-500" />
+                  ) : (
+                    <TrendingDown className="w-3 h-3 text-red-500" />
+                  )}
+                </Badge>
+              </HoverCardTrigger>
+              <HoverCardContent className="w-80 p-3">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-4 h-4 rounded-full" 
+                      style={{ backgroundColor: tagDef.color }}
+                    />
+                    <span className="font-semibold">{tagDef.name}</span>
+                  </div>
+                  {tagDef.description && (
+                    <p className="text-sm text-muted-foreground">{tagDef.description}</p>
+                  )}
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span>Impact: {assignment.impact}</span>
+                    <span>Assigned: {new Date(assignment.assignedAt).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span>Usage: {tagDef.usageCount} times</span>
+                    {tagDef.lastUsed && (
+                      <span>Last used: {new Date(tagDef.lastUsed).toLocaleDateString()}</span>
+                    )}
+                  </div>
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          );
+        })}
+      </div>
+    );
   };
 
   // Toggle trade marking
@@ -869,6 +990,65 @@ export function ReplacedCompareDialog({
 
         {/* Scrollable content area */}
         <div className="flex-1 overflow-y-auto min-h-0">
+          {/* Tags Section - Only show if tags exist */}
+          {(replacedData.metadata?.tagAssignments && replacedData.metadata.tagAssignments.length > 0) || 
+           (currentCompareData?.metadata?.tagAssignments && currentCompareData.metadata.tagAssignments.length > 0) ? (
+            <div className="space-y-4 mb-6">
+              <div className="text-lg font-semibold flex items-center gap-2">
+                <Tag className="w-5 h-5 text-muted-foreground" />
+                Tags
+              </div>
+              {loadingTags ? (
+                <div className="flex items-center justify-center py-4">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm text-muted-foreground">Loading tags...</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Replaced Compare Tags */}
+                  {replacedData.metadata?.tagAssignments && replacedData.metadata.tagAssignments.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                        <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300 text-xs">
+                          Replaced
+                        </Badge>
+                        Tags
+                      </div>
+                      <div className="bg-muted/30 rounded-lg p-4 border border-muted-foreground/20">
+                        {renderTagAssignments(replacedData.metadata.tagAssignments)}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Current Compare Tags */}
+                  {currentCompareData?.metadata?.tagAssignments && currentCompareData.metadata.tagAssignments.length > 0 && (
+                    <div>
+                      <div className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">
+                          Current
+                        </Badge>
+                        Tags
+                      </div>
+                      <div className="bg-muted/30 rounded-lg p-4 border border-muted-foreground/20">
+                        {renderTagAssignments(currentCompareData.metadata.tagAssignments)}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* No tags message */}
+                  {(!replacedData.metadata?.tagAssignments || replacedData.metadata.tagAssignments.length === 0) &&
+                   (!currentCompareData?.metadata?.tagAssignments || currentCompareData.metadata.tagAssignments.length === 0) && (
+                    <div className="text-center py-4 text-muted-foreground">
+                      <p>No tags assigned to this comparison data</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : null}
+
           {/* Notes Section */}
           <div className="space-y-4">
           <div className="text-lg font-semibold">Notes</div>

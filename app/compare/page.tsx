@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useRef } from "react";
+import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { X, Eye, Clipboard } from "lucide-react";
+import { X, Eye, Clipboard, Tag, TrendingUp, TrendingDown } from "lucide-react";
 import { ReplacedCompareDialog } from "@/components/ReplacedCompareDialog";
 import { CompareTradingDialog } from "@/components/CompareTradingDialog";
 import { BacktestRemainingDays, type BacktestRemainingDaysRef } from "@/components/BacktestRemainingDays";
 import { DailyStats, TradeListEntry } from "@/lib/trading-log-parser";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 // Transform TradingLogAnalysis to DailyStats format for the compare dialog
 const transformToDailyStats = (analysis: any, dateStr: string): DailyStats & { tradeList?: TradeListEntry[] } => {
@@ -54,6 +55,16 @@ const transformToDailyStats = (analysis: any, dateStr: string): DailyStats & { t
   };
 };
 
+interface TagDefinition {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  createdAt: string;
+  lastUsed?: string;
+  usageCount: number;
+}
+
 interface SubmissionLog {
   id: string;
   date: string;
@@ -69,6 +80,11 @@ interface SubmissionLog {
   wasReplaced?: boolean; // Whether this submission replaced existing data
   replacedDataDeleted?: boolean; // Whether the replaced data has been deleted
   baseNotes?: string; // Notes from base data
+  replacedTags?: Array<{
+    tagId: string;
+    impact: 'positive' | 'negative';
+    assignedAt: string;
+  }>;
 }
 
 export default function ComparePage() {
@@ -84,9 +100,78 @@ export default function ComparePage() {
     compareStats: DailyStats & { tradeList?: TradeListEntry[] };
   } | null>(null);
   const [loadingDialogData, setLoadingDialogData] = useState<Set<string>>(new Set());
+  const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
+  const [loadingTags, setLoadingTags] = useState(false);
 
   // Ref for the backtest remaining days component
   const backtestRemainingDaysRef = useRef<BacktestRemainingDaysRef>(null);
+
+  // Load tag definitions on component mount
+  React.useEffect(() => {
+    loadTagDefinitions();
+  }, []);
+
+  // Load tags for existing replaced submissions
+  React.useEffect(() => {
+    if (tagDefinitions.length > 0 && submissionLog.length > 0) {
+      loadTagsForReplacedSubmissions();
+    }
+  }, [tagDefinitions, submissionLog]);
+
+  // Function to load tags for all replaced submissions
+  const loadTagsForReplacedSubmissions = async () => {
+    const replacedSubmissions = submissionLog.filter(log => log.wasReplaced && !log.replacedTags);
+    
+    for (const submission of replacedSubmissions) {
+      if (!submission.dataDate) continue;
+      
+      try {
+        const dateParts = submission.dataDate.split('/');
+        if (dateParts.length !== 3) continue;
+        
+        const apiDate = `${dateParts[2]}-${dateParts[0].padStart(2, '0')}-${dateParts[1].padStart(2, '0')}`;
+        
+        const response = await fetch(`/api/trading-data/compare/replaced?date=${apiDate}`);
+        
+        if (response.ok) {
+          const replacedData = await response.json();
+          
+          if (replacedData.metadata?.tagAssignments && replacedData.metadata.tagAssignments.length > 0) {
+            setSubmissionLog(prev => prev.map(log => 
+              log.id === submission.id 
+                ? { ...log, replacedTags: replacedData.metadata.tagAssignments }
+                : log
+            ));
+          }
+        }
+      } catch (error) {
+        console.error('Error loading tags for submission:', submission.id, error);
+      }
+    }
+  };
+
+  // Function to load tag definitions
+  const loadTagDefinitions = async () => {
+    try {
+      setLoadingTags(true);
+      const response = await fetch('/api/trading-data/tags');
+      if (response.ok) {
+        const tags = await response.json();
+        setTagDefinitions(tags);
+      } else {
+        console.error('Failed to load tag definitions');
+      }
+    } catch (error) {
+      console.error('Error loading tag definitions:', error);
+    } finally {
+      setLoadingTags(false);
+    }
+  };
+
+  // Helper function to get tag definition by ID
+  const getTagDefinition = (tagId: string): TagDefinition | undefined => {
+    return tagDefinitions.find(tag => tag.id === tagId);
+  };
 
   // Function to get PnL color based on value (same logic as trading card)
   const getPnlColor = (value: number) => {
@@ -190,6 +275,70 @@ export default function ComparePage() {
     return undefined;
   };
 
+  // Function to render tag assignments
+  const renderTagAssignments = (tagAssignments: any[]) => {
+    if (!tagAssignments || tagAssignments.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap gap-1">
+        {tagAssignments.map((assignment) => {
+          const tagDef = getTagDefinition(assignment.tagId);
+          
+          if (!tagDef) {
+            return null;
+          }
+          
+          return (
+            <HoverCard key={assignment.tagId}>
+              <HoverCardTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className="flex items-center gap-1 cursor-help text-xs"
+                  style={{ 
+                    borderColor: tagDef.color + '40', 
+                    backgroundColor: tagDef.color + '10' 
+                  }}
+                >
+                  <Tag className="w-2 h-2" style={{ color: tagDef.color }} />
+                  <span style={{ color: tagDef.color }}>{tagDef.name}</span>
+                  {assignment.impact === 'positive' ? (
+                    <TrendingUp className="w-2 h-2 text-green-500" />
+                  ) : (
+                    <TrendingDown className="w-2 h-2 text-red-500" />
+                  )}
+                </Badge>
+              </HoverCardTrigger>
+              <HoverCardContent className="w-80 p-3">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-4 h-4 rounded-full" 
+                      style={{ backgroundColor: tagDef.color }}
+                    />
+                    <span className="font-semibold">{tagDef.name}</span>
+                  </div>
+                  {tagDef.description && (
+                    <p className="text-sm text-muted-foreground">{tagDef.description}</p>
+                  )}
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span>Impact: {assignment.impact}</span>
+                    <span>Assigned: {new Date(assignment.assignedAt).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span>Usage: {tagDef.usageCount} times</span>
+                    {tagDef.lastUsed && (
+                      <span>Last used: {new Date(tagDef.lastUsed).toLocaleDateString()}</span>
+                    )}
+                  </div>
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          );
+        })}
+      </div>
+    );
+  };
+
   // Function to fetch and open replaced comparison dialog
   const handleViewReplacedCompare = async (submission: SubmissionLog) => {
     if (!submission.dataDate) return;
@@ -207,6 +356,15 @@ export default function ComparePage() {
         const replacedData = await response.json();
         setSelectedReplacedData(replacedData);
         setReplacedCompareDialogOpen(true);
+        
+        // Also fetch tags for the replaced data to display in the submission log
+        if (replacedData.metadata?.tagAssignments && replacedData.metadata.tagAssignments.length > 0) {
+          setSubmissionLog(prev => prev.map(log => 
+            log.id === submission.id 
+              ? { ...log, replacedTags: replacedData.metadata.tagAssignments }
+              : log
+          ));
+        }
       } else {
         toast.error("No replaced comparison data found for this date");
       }
@@ -431,6 +589,13 @@ export default function ComparePage() {
         setSubmissionLog(prev => [newSubmission, ...prev]);
         setLogData('');
         
+        // If this was a replaced submission, load tags for it
+        if (result.replaced && dataDate) {
+          setTimeout(() => {
+            loadTagsForReplacedSubmissions();
+          }, 100);
+        }
+        
         // Auto-mark backtest queue item as completed if it exists
         if (dataDate) {
           const dateParts = dataDate.split('/');
@@ -610,6 +775,22 @@ export default function ComparePage() {
                             <div className="text-xs text-muted-foreground whitespace-pre-wrap">{log.baseNotes}</div>
                           </div>
                         )}
+                        
+                        {/* Replaced Compare Tags */}
+                        {log.wasReplaced && (
+                          <div className="mt-2 ml-4 p-2 bg-muted/30 rounded-lg border-l-2 border-orange-400">
+                            <div className="text-xs font-medium text-orange-600 mb-1">Replaced Compare Tags:</div>
+                            {log.replacedTags && log.replacedTags.length > 0 ? (
+                              renderTagAssignments(log.replacedTags)
+                            ) : (
+                              <div className="text-xs text-muted-foreground italic">
+                                {loadingTags ? 'Loading tags...' : 'No tags assigned'}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+
                       </div>
                     ))}
                   </div>

@@ -986,6 +986,7 @@ class TradingDataStore {
 
   async saveReplacedComparison(date: string, replacedData: DailyLog): Promise<void> {
     // Add metadata to indicate when and why this was replaced
+    // Preserve all existing metadata including tagAssignments
     const enhancedData: DailyLog = {
       ...replacedData,
       metadata: {
