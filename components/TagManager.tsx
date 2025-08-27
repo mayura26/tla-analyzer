@@ -14,6 +14,7 @@ export interface TagDefinition {
   name: string;
   description?: string;
   color: string;
+  image?: string; // Base64 encoded image data
   createdAt: string;
   lastUsed?: string;
   usageCount: number;
@@ -37,6 +38,7 @@ export function TagManager({ className }: TagManagerProps) {
   const [tagName, setTagName] = useState('');
   const [tagDescription, setTagDescription] = useState('');
   const [tagColor, setTagColor] = useState('#3b82f6');
+  const [tagImage, setTagImage] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'name' | 'createdAt' | 'usageCount' | 'lastUsed'>('name');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -45,6 +47,41 @@ export function TagManager({ className }: TagManagerProps) {
   useEffect(() => {
     loadTags();
   }, []);
+
+  // Global paste event listener
+  useEffect(() => {
+    const handleGlobalPaste = (event: ClipboardEvent) => {
+      // Only handle paste if we're in a create or edit dialog
+      if (!isCreateDialogOpen && !isEditDialogOpen) return;
+      
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.indexOf('image') !== -1) {
+          const file = item.getAsFile();
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const result = e.target?.result as string;
+              if (result) {
+                setTagImage(result);
+                toast.success('Image pasted successfully!');
+              }
+            };
+            reader.readAsDataURL(file);
+          }
+          break;
+        }
+      }
+    };
+
+    document.addEventListener('paste', handleGlobalPaste);
+    return () => {
+      document.removeEventListener('paste', handleGlobalPaste);
+    };
+  }, [isCreateDialogOpen, isEditDialogOpen]);
 
   const loadTags = async () => {
     try {
@@ -81,6 +118,7 @@ export function TagManager({ className }: TagManagerProps) {
           name: tagName.trim(),
           description: tagDescription.trim() || undefined,
           color: tagColor,
+          image: tagImage || undefined,
         }),
       });
 
@@ -117,6 +155,7 @@ export function TagManager({ className }: TagManagerProps) {
           name: tagName.trim(),
           description: tagDescription.trim() || undefined,
           color: tagColor,
+          image: tagImage || undefined,
         }),
       });
 
@@ -177,6 +216,7 @@ export function TagManager({ className }: TagManagerProps) {
     setTagName(tag.name);
     setTagDescription(tag.description || '');
     setTagColor(tag.color);
+    setTagImage(tag.image || '');
     setIsEditDialogOpen(true);
   };
 
@@ -184,11 +224,61 @@ export function TagManager({ className }: TagManagerProps) {
     setTagName('');
     setTagDescription('');
     setTagColor('#3b82f6');
+    setTagImage('');
   };
 
   const openCreateDialog = () => {
     resetForm();
     setIsCreateDialogOpen(true);
+  };
+
+  // Handle paste events for images
+  const handlePaste = (event: React.ClipboardEvent) => {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.indexOf('image') !== -1) {
+        const file = item.getAsFile();
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const result = e.target?.result as string;
+            if (result) {
+              setTagImage(result);
+              toast.success('Image pasted successfully!');
+            }
+          };
+          reader.readAsDataURL(file);
+        }
+        break;
+      }
+    }
+  };
+
+  // Handle image file upload
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        if (result) {
+          setTagImage(result);
+          toast.success('Image uploaded successfully!');
+        }
+      };
+      reader.readAsDataURL(file);
+    } else if (file) {
+      toast.error('Please select an image file');
+    }
+  };
+
+  // Remove image
+  const removeImage = () => {
+    setTagImage('');
+    toast.success('Image removed');
   };
 
   const formatDate = (dateString: string) => {
@@ -384,6 +474,17 @@ export function TagManager({ className }: TagManagerProps) {
                     </div>
                   </div>
 
+                  {/* Tag image */}
+                  {tag.image && (
+                    <div className="mb-3">
+                      <img
+                        src={tag.image}
+                        alt={`${tag.name} tag image`}
+                        className="w-full h-24 object-cover rounded border"
+                      />
+                    </div>
+                  )}
+
                   {/* Tag description */}
                   {tag.description && (
                     <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
@@ -439,6 +540,18 @@ export function TagManager({ className }: TagManagerProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Image instructions */}
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-1">💡 Image Tips:</p>
+                <ul className="text-xs space-y-1">
+                  <li>• Copy an image from anywhere (screenshot, web, etc.)</li>
+                  <li>• Press Ctrl+V to paste it directly</li>
+                  <li>• Or use the file upload option below</li>
+                </ul>
+              </div>
+            </div>
+            
             <div>
               <Label htmlFor="tag-name">Tag Name</Label>
               <Input
@@ -484,6 +597,74 @@ export function TagManager({ className }: TagManagerProps) {
                 </div>
               </div>
             </div>
+
+            <div>
+              <Label htmlFor="tag-image">Image (Optional)</Label>
+              <div className="mt-1 space-y-3">
+                {/* Image preview */}
+                {tagImage && (
+                  <div className="relative">
+                    <img
+                      src={tagImage}
+                      alt="Tag image preview"
+                      className="w-full h-32 object-cover rounded border"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={removeImage}
+                      className="absolute top-2 right-2 h-6 w-6 p-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+                
+                {/* Image input methods */}
+                <div className="space-y-2">
+                  {/* File upload */}
+                  <div>
+                    <Label htmlFor="image-upload" className="text-sm text-muted-foreground">
+                      Upload Image
+                    </Label>
+                    <Input
+                      id="image-upload"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  {/* Paste area */}
+                  <div>
+                    <Label className="text-sm text-muted-foreground">
+                      Or Paste Image (Ctrl+V)
+                    </Label>
+                    <div
+                      className="mt-1 p-4 border-2 border-dashed border-muted-foreground/25 rounded-lg text-center cursor-pointer hover:border-muted-foreground/50 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      onPaste={handlePaste}
+                      onClick={() => {
+                        // Focus the element to make it clear it's ready for pasting
+                        const element = document.activeElement as HTMLElement;
+                        if (element) element.focus();
+                      }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label="Paste image here"
+                    >
+                      <div className="text-sm text-muted-foreground">
+                        {tagImage ? 'Image pasted! Click to paste a different one.' : 'Paste an image from your clipboard here'}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Click here and press Ctrl+V, or just press Ctrl+V anywhere
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
             <div className="flex justify-end gap-2">
               <Button
                 variant="outline"
@@ -509,6 +690,18 @@ export function TagManager({ className }: TagManagerProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Image instructions */}
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-1">💡 Image Tips:</p>
+                <ul className="text-xs space-y-1">
+                  <li>• Copy an image from anywhere (screenshot, web, etc.)</li>
+                  <li>• Press Ctrl+V to paste it directly</li>
+                  <li>• Or use the file upload option below</li>
+                </ul>
+              </div>
+            </div>
+            
             <div>
               <Label htmlFor="edit-tag-name">Tag Name</Label>
               <Input
@@ -551,6 +744,74 @@ export function TagManager({ className }: TagManagerProps) {
                       title={`Select ${color}`}
                     />
                   ))}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="edit-tag-image">Image (Optional)</Label>
+              <div className="mt-1 space-y-3">
+                {/* Image preview */}
+                {tagImage && (
+                  <div className="relative">
+                    <img
+                      src={tagImage}
+                      alt="Tag image preview"
+                      className="w-full h-32 object-cover rounded border"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={removeImage}
+                      className="absolute top-2 right-2 h-6 w-6 p-0"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+                
+                {/* Image input methods */}
+                <div className="space-y-2">
+                  {/* File upload */}
+                  <div>
+                    <Label htmlFor="edit-image-upload" className="text-sm text-muted-foreground">
+                      Upload Image
+                    </Label>
+                    <Input
+                      id="edit-image-upload"
+                      type="file"
+                      accept="image/*"
+                      className="mt-1"
+                      onChange={handleImageUpload}
+                    />
+                  </div>
+                  
+                  {/* Paste area */}
+                  <div>
+                    <Label className="text-sm text-muted-foreground">
+                      Or Paste Image (Ctrl+V)
+                    </Label>
+                    <div
+                      className="mt-1 p-4 border-2 border-dashed border-muted-foreground/25 rounded-lg text-center cursor-pointer hover:border-muted-foreground/50 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      onPaste={handlePaste}
+                      onClick={() => {
+                        // Focus the element to make it clear it's ready for pasting
+                        const element = document.activeElement as HTMLElement;
+                        if (element) element.focus();
+                      }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label="Paste image here"
+                    >
+                      <div className="text-sm text-muted-foreground">
+                        {tagImage ? 'Image pasted! Click to paste a different one.' : 'Paste an image from your clipboard here'}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Click here and press Ctrl+V, or just press Ctrl+V anywhere
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

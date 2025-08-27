@@ -7,6 +7,7 @@ export interface TagDefinition {
   name: string;
   description?: string;
   color: string;
+  image?: string; // Base64 encoded image data
   createdAt: string;
   lastUsed?: string;
   usageCount: number;
@@ -94,7 +95,7 @@ export async function GET() {
 // POST /api/trading-data/tags - Create or update a tag
 export async function POST(request: Request) {
   try {
-    const { id, name, description, color } = await request.json();
+    const { id, name, description, color, image } = await request.json();
     
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       return NextResponse.json(
@@ -126,6 +127,7 @@ export async function POST(request: Request) {
         name: tagName,
         description: description || tagsData.tags[existingTagIndex].description,
         color: color || tagsData.tags[existingTagIndex].color,
+        image: image !== undefined ? image : tagsData.tags[existingTagIndex].image,
       };
     } else {
       // Creating new tag
@@ -134,6 +136,7 @@ export async function POST(request: Request) {
         name: tagName,
         description,
         color: color || generateTagColor(),
+        image,
         createdAt: new Date().toISOString(),
         usageCount: 0
       };
