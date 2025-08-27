@@ -18,6 +18,8 @@ export interface TagDefinition {
   createdAt: string;
   lastUsed?: string;
   usageCount: number;
+  positiveCount?: number;
+  negativeCount?: number;
 }
 
 interface TagManagerProps {
@@ -97,6 +99,29 @@ export function TagManager({ className }: TagManagerProps) {
     } catch (error) {
       console.error('Error loading tags:', error);
       toast.error('Failed to load tags');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const recalculateTagCounts = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/trading-data/tags/recalculate', {
+        method: 'POST',
+      });
+      if (response.ok) {
+        const result = await response.json();
+        toast.success(`Successfully recalculated ${result.updatedTags} tags`);
+        // Reload tags to get updated counts
+        await loadTags();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to recalculate tag counts');
+      }
+    } catch (error) {
+      console.error('Error recalculating tag counts:', error);
+      toast.error('Failed to recalculate tag counts');
     } finally {
       setLoading(false);
     }
@@ -341,15 +366,27 @@ export function TagManager({ className }: TagManagerProps) {
             {tags.length} tags
           </Badge>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={openCreateDialog}
-          className="gap-2"
-        >
-          <Plus className="h-4 w-4" />
-          New Tag
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={recalculateTagCounts}
+            disabled={loading}
+            className="gap-2"
+          >
+            <Loader2 className={`h-4 w-4 ${loading ? 'animate-spin' : 'hidden'}`} />
+            Recalculate Counts
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openCreateDialog}
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            New Tag
+          </Button>
+        </div>
       </div>
 
       {/* Content */}
@@ -508,6 +545,16 @@ export function TagManager({ className }: TagManagerProps) {
                       <Tag className="h-3 w-3" />
                       <span>Used {tag.usageCount} time{tag.usageCount !== 1 ? 's' : ''}</span>
                     </div>
+                    {(tag.positiveCount !== undefined || tag.negativeCount !== undefined) && (
+                      <div className="flex items-center gap-4 text-xs">
+                        {tag.positiveCount !== undefined && tag.positiveCount > 0 && (
+                          <span className="text-green-600">+{tag.positiveCount} positive</span>
+                        )}
+                        {tag.negativeCount !== undefined && tag.negativeCount > 0 && (
+                          <span className="text-red-600">-{tag.negativeCount} negative</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

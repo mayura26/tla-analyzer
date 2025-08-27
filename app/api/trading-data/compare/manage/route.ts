@@ -145,6 +145,23 @@ export async function POST(request: Request) {
             { status: 404 }
           );
         }
+        
+        // Update tag usage statistics
+        try {
+          const baseUrl = process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3000}`;
+          await fetch(`${baseUrl}/api/trading-data/tags`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              tagIds: [tagId], 
+              impact: impact 
+            })
+          });
+        } catch (error) {
+          console.error('Failed to update tag usage statistics:', error);
+          // Don't fail the main operation if usage tracking fails
+        }
+        
         return NextResponse.json({ 
           success: true, 
           message: 'Tag assigned to compare data',
@@ -165,6 +182,34 @@ export async function POST(request: Request) {
             { status: 404 }
           );
         }
+        
+        // Decrement tag usage statistics when tag is removed
+        try {
+          // Get the tag assignment to determine impact for decrementing
+          const compareData = await tradingDataStore.getCompareByDate(date);
+          if (compareData?.metadata?.tagAssignments) {
+            const removedAssignment = compareData.metadata.tagAssignments.find(
+              (assignment: any) => assignment.tagId === tagId
+            );
+            
+            if (removedAssignment) {
+              const baseUrl = process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3000}`;
+              await fetch(`${baseUrl}/api/trading-data/tags`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  tagIds: [tagId], 
+                  impact: removedAssignment.impact,
+                  action: 'decrement'
+                })
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Failed to decrement tag usage statistics:', error);
+          // Don't fail the main operation if usage tracking fails
+        }
+        
         return NextResponse.json({ 
           success: true, 
           message: 'Tag removed from compare data',
@@ -187,18 +232,91 @@ export async function POST(request: Request) {
         }
 
         // Update tag usage statistics
-        if (tagAssignments.length > 0) {
-          try {
-            const tagIds = tagAssignments.map((assignment: any) => assignment.tagId);
-            await fetch(new URL('/api/trading-data/tags', request.url), {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tagIds })
-            });
-          } catch (error) {
-            console.error('Failed to update tag usage statistics:', error);
-            // Don't fail the main operation if usage tracking fails
+        try {
+          // Get existing tag assignments to handle impact changes
+          const existingData = await tradingDataStore.getCompareByDate(date);
+          const existingAssignments = existingData?.metadata?.tagAssignments || [];
+          
+          // Use absolute URL for internal API call
+          const baseUrl = process.env.NEXTAUTH_URL || `http://localhost:${process.env.PORT || 3000}`;
+          
+          if (tagAssignments.length > 0) {
+            // Create maps for efficient lookup
+            const newAssignmentsMap = new Map(tagAssignments.map(a => [a.tagId, a]));
+            const existingAssignmentsMap = new Map(existingAssignments.map(a => [a.tagId, a]));
+            
+            // Handle each tag assignment
+            for (const [tagId, newAssignment] of newAssignmentsMap) {
+              const existingAssignment = existingAssignmentsMap.get(tagId);
+              
+              if (!existingAssignment) {
+                // New tag assignment - increment
+                await fetch(`${baseUrl}/api/trading-data/tags`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    tagIds: [tagId], 
+                    impact: newAssignment.impact 
+                  })
+                });
+              } else if (existingAssignment.impact !== newAssignment.impact) {
+                // Impact changed - decrement old impact, increment new impact
+                // Decrement old impact
+                await fetch(`${baseUrl}/api/trading-data/tags`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    tagIds: [tagId], 
+                    impact: existingAssignment.impact,
+                    action: 'decrement'
+                  })
+                });
+                
+                // Increment new impact
+                await fetch(`${baseUrl}/api/trading-data/tags`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    tagIds: [tagId], 
+                    impact: newAssignment.impact 
+                  })
+                });
+              }
+              // If impact is the same, no change needed
+            }
+            
+            // Handle removed tags
+            for (const [tagId, existingAssignment] of existingAssignmentsMap) {
+              if (!newAssignmentsMap.has(tagId)) {
+                // Tag was removed - decrement
+                await fetch(`${baseUrl}/api/trading-data/tags`, {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    tagIds: [tagId], 
+                    impact: existingAssignment.impact,
+                    action: 'decrement'
+                  })
+                });
+              }
+            }
+          } else if (existingAssignments.length > 0) {
+            // All tags were removed - decrement all existing assignments
+            for (const existingAssignment of existingAssignments) {
+              await fetch(`${baseUrl}/api/trading-data/tags`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                  tagIds: [existingAssignment.tagId], 
+                  impact: existingAssignment.impact,
+                  action: 'decrement'
+                })
+              });
+            }
           }
+        } catch (error) {
+          console.error('Failed to update tag usage statistics:', error);
+          // Don't fail the main operation if usage tracking fails
         }
 
         return NextResponse.json({ 

@@ -11,6 +11,8 @@ export interface TagDefinition {
   createdAt: string;
   lastUsed?: string;
   usageCount: number;
+  positiveCount?: number;
+  negativeCount?: number;
 }
 
 interface TagDefinitionsFile {
@@ -82,7 +84,24 @@ function generateTagColor(): string {
 export async function GET() {
   try {
     const tagsData = await readTagsFile();
-    return NextResponse.json(tagsData.tags);
+    
+    // Ensure all tags have the new count fields
+    const updatedTags = tagsData.tags.map(tag => ({
+      ...tag,
+      positiveCount: tag.positiveCount ?? 0,
+      negativeCount: tag.negativeCount ?? 0
+    }));
+    
+    // Check if any tags are missing the new count fields and need recalculation
+    const needsRecalculation = tagsData.tags.some(tag => 
+      tag.positiveCount === undefined || tag.negativeCount === undefined
+    );
+    
+    if (needsRecalculation) {
+      console.log('Some tags are missing count fields, consider running recalculate endpoint');
+    }
+    
+    return NextResponse.json(updatedTags);
   } catch (error) {
     console.error("Error in tags GET:", error);
     return NextResponse.json(
@@ -138,7 +157,9 @@ export async function POST(request: Request) {
         color: color || generateTagColor(),
         image,
         createdAt: new Date().toISOString(),
-        usageCount: 0
+        usageCount: 0,
+        positiveCount: 0,
+        negativeCount: 0
       };
       tagsData.tags.push(newTag);
     }
@@ -160,7 +181,7 @@ export async function POST(request: Request) {
 // PUT /api/trading-data/tags - Update tag usage statistics
 export async function PUT(request: Request) {
   try {
-    const { tagIds } = await request.json();
+    const { tagIds, impact, action } = await request.json();
     
     if (!Array.isArray(tagIds) || tagIds.length === 0) {
       return NextResponse.json(
@@ -176,8 +197,28 @@ export async function PUT(request: Request) {
     tagIds.forEach((tagId: string) => {
       const tagIndex = tagsData.tags.findIndex(tag => tag.id === tagId);
       if (tagIndex >= 0) {
-        tagsData.tags[tagIndex].usageCount = (tagsData.tags[tagIndex].usageCount || 0) + 1;
-        tagsData.tags[tagIndex].lastUsed = now;
+        if (action === 'decrement') {
+          // Decrement counts
+          tagsData.tags[tagIndex].usageCount = Math.max(0, (tagsData.tags[tagIndex].usageCount || 0) - 1);
+          
+          // Decrement positive/negative counts if impact is provided
+          if (impact === 'positive') {
+            tagsData.tags[tagIndex].positiveCount = Math.max(0, (tagsData.tags[tagIndex].positiveCount || 0) - 1);
+          } else if (impact === 'negative') {
+            tagsData.tags[tagIndex].negativeCount = Math.max(0, (tagsData.tags[tagIndex].negativeCount || 0) - 1);
+          }
+        } else {
+          // Increment counts (default behavior)
+          tagsData.tags[tagIndex].usageCount = (tagsData.tags[tagIndex].usageCount || 0) + 1;
+          tagsData.tags[tagIndex].lastUsed = now;
+          
+          // Update positive/negative counts if impact is provided
+          if (impact === 'positive') {
+            tagsData.tags[tagIndex].positiveCount = (tagsData.tags[tagIndex].positiveCount || 0) + 1;
+          } else if (impact === 'negative') {
+            tagsData.tags[tagIndex].negativeCount = (tagsData.tags[tagIndex].negativeCount || 0) + 1;
+          }
+        }
       }
     });
     
