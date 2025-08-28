@@ -28,6 +28,11 @@ interface CompareTradingDialogProps {
 type SessionKey = keyof DailyStats['sessionBreakdown'];
 
 export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats, onMerge, onVerificationChange }: CompareTradingDialogProps) {
+  // Don't render if stats are not available
+  if (!baseStats || !compareStats) {
+    return null;
+  }
+  
   const [isVerified, setIsVerified] = useState(false);
   const [tagAssignments, setTagAssignments] = useState<TagAssignment[]>([]);
   const [baseDayNotes, setBaseDayNotes] = useState("");
@@ -112,7 +117,7 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
 
   // Automatically mark ID-only changed trades as processed
   useEffect(() => {
-    if (isOpen && baseStats.tradeList && compareStats.tradeList) {
+    if (isOpen && baseStats?.tradeList && compareStats?.tradeList) {
       const baseTrades = baseStats.tradeList;
       const compareTrades = compareStats.tradeList;
       
@@ -151,7 +156,7 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
         });
       }
     }
-  }, [isOpen, baseStats.tradeList, compareStats.tradeList, baseStats, compareStats]);
+  }, [isOpen, baseStats?.tradeList, compareStats?.tradeList, baseStats, compareStats]);
 
   // Helper function to ensure date is in YYYY-MM-DD format
   const getFormattedDate = (dateInput: string | Date): string => {
@@ -174,10 +179,12 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
     if (isOpen && baseStats.date) {
       loadExistingMetadata();
     }
-  }, [isOpen, baseStats.date]);
+  }, [isOpen, baseStats?.date]);
 
   const loadExistingMetadata = async () => {
     try {
+      if (!baseStats?.date) return;
+      
       setIsLoading(true);
       const formattedDate = getFormattedDate(baseStats.date);
       console.log('Loading metadata for date:', baseStats.date, '-> formatted:', formattedDate);
@@ -213,6 +220,8 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
 
   const saveVerificationStatus = async (verified: boolean) => {
     try {
+      if (!baseStats?.date) return;
+      
       setIsSaving(true);
       const formattedDate = getFormattedDate(baseStats.date);
       const response = await fetch('/api/trading-data/compare/manage', {
@@ -873,6 +882,15 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
   };
 
   const renderSessionComparison = () => {
+    // Check if sessionBreakdown exists
+    if (!baseStats.sessionBreakdown || !compareStats.sessionBreakdown) {
+      return (
+        <div className="p-4 text-center text-muted-foreground">
+          No session breakdown data available
+        </div>
+      );
+    }
+    
     const sessions = (Object.keys(baseStats.sessionBreakdown) as SessionKey[]).filter(session => session.toLowerCase() !== 'main');
     return (
       <div className="space-y-4">
@@ -926,6 +944,15 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
   };
 
   const renderTradeComparison = () => {
+    // Check if tradeList exists
+    if (!baseStats.tradeList || !compareStats.tradeList) {
+      return (
+        <div className="p-4 text-center text-muted-foreground">
+          No trade data available for comparison
+        </div>
+      );
+    }
+    
     // Get trade lists from the stats
     const baseTrades = baseStats.tradeList || [];
     const compareTrades = compareStats.tradeList || [];
@@ -1152,8 +1179,8 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
                   </div>
                 )}
               </div>
-              <Badge className={`font-bold text-lg px-3 py-1 ${getBadgeColors(compareStats.totalPnl - baseStats.totalPnl)}`}>
-                {formatCurrency(compareStats.totalPnl - baseStats.totalPnl)}
+              <Badge className={`font-bold text-lg px-3 py-1 ${getBadgeColors((compareStats.totalPnl || 0) - (baseStats.totalPnl || 0))}`}>
+                {formatCurrency((compareStats.totalPnl || 0) - (baseStats.totalPnl || 0))}
               </Badge>
             </div>
             
@@ -1166,12 +1193,12 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
                   <span>New</span>
                 </div>
                 <div className="flex items-center justify-between mt-1 text-lg">
-                  <span className={`font-semibold ${getPnlColor(baseStats.totalPnl)}`}>
-                    {formatCurrency(baseStats.totalPnl)}
+                  <span className={`font-semibold ${getPnlColor(baseStats.totalPnl || 0)}`}>
+                    {formatCurrency(baseStats.totalPnl || 0)}
                   </span>
                   <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                  <span className={`font-semibold ${getPnlColor(compareStats.totalPnl)}`}>
-                    {formatCurrency(compareStats.totalPnl)}
+                  <span className={`font-semibold ${getPnlColor(compareStats.totalPnl || 0)}`}>
+                    {formatCurrency(compareStats.totalPnl || 0)}
                   </span>
                 </div>
               </div>
@@ -1184,9 +1211,9 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
                   <span>New</span>
                 </div>
                 <div className="flex items-center justify-between mt-1 text-lg font-semibold">
-                  <span>{baseStats.wins}-{baseStats.losses}</span>
+                  <span>{(baseStats.wins || 0)}-{(baseStats.losses || 0)}</span>
                   <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                  <span>{compareStats.wins}-{compareStats.losses}</span>
+                  <span>{(compareStats.wins || 0)}-{(compareStats.losses || 0)}</span>
                 </div>
               </div>
             </div>

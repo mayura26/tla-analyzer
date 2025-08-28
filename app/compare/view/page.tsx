@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CompareWeeklyAccordion } from "@/components/CompareWeeklyAccordion";
+import { CompareTradingDialog } from "@/components/CompareTradingDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -61,6 +62,9 @@ export default function CompareViewPage() {
   const [tagAnalyticsExpanded, setTagAnalyticsExpanded] = useState(false);
   const [showOnlyUnverified, setShowOnlyUnverified] = useState(false);
   const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all');
+  const [compareTradingDialogOpen, setCompareTradingDialogOpen] = useState(false);
+  const [selectedBaseStats, setSelectedBaseStats] = useState<any>(null);
+  const [selectedCompareStats, setSelectedCompareStats] = useState<any>(null);
 
   const fetchData = async () => {
     try {
@@ -163,6 +167,43 @@ export default function CompareViewPage() {
       .sort((a, b) => Math.abs(b.totalPnlImpact) - Math.abs(a.totalPnlImpact));
 
     setTagAnalytics(analyticsArray);
+  };
+
+  const fetchTaggedDayData = async (date: string) => {
+    try {
+      const res = await fetch(`/api/trading-data/compare/tagged-day/${date}`);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch tagged day data for ${date}: ${res.statusText}`);
+      }
+      const data = await res.json();
+      
+      // Validate that we have the required data
+      if (!data.baseAnalysis || !data.compareAnalysis) {
+        throw new Error('Missing required data for comparison');
+      }
+      
+      // The API now returns analysis data flattened to top level
+      // We just need to add the date and tradeList
+      const baseStats = {
+        ...data,
+        date: data.date,
+        tradeList: data.baseTradeList || []
+      };
+      
+      const compareStats = {
+        ...data,
+        date: data.date,
+        tradeList: data.compareTradeList || []
+      };
+      
+      setSelectedBaseStats(baseStats);
+      setSelectedCompareStats(compareStats);
+      setCompareTradingDialogOpen(true);
+    } catch (error) {
+      toast.error('Failed to load tagged day data', {
+        description: `There was an error loading the tagged day data for ${date}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+    }
   };
 
   useEffect(() => {
@@ -730,7 +771,12 @@ export default function CompareViewPage() {
                 <CardContent>
                   <div className="space-y-4">
                     {taggedDays.map((day, index) => (
-                      <div key={index} className={`p-4 rounded-lg border ${day.verified ? 'border-green-500/30 bg-green-500/10' : 'border-muted'}`}>
+                      <div 
+                        key={index} 
+                        className={`p-4 rounded-lg border cursor-pointer hover:bg-muted/50 transition-colors ${day.verified ? 'border-green-500/30 bg-green-500/10' : 'border-muted'}`}
+                        onClick={() => fetchTaggedDayData(day.date)}
+                        title="Click to view detailed comparison"
+                      >
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm">{day.date}</span>
@@ -739,6 +785,9 @@ export default function CompareViewPage() {
                                 Verified
                               </Badge>
                             )}
+                            <Badge variant="outline" className="text-xs text-muted-foreground">
+                              Click to view
+                            </Badge>
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="text-right">
@@ -785,6 +834,20 @@ export default function CompareViewPage() {
                 </CardContent>
               )}
             </Card>
+          )}
+
+          {selectedBaseStats && selectedCompareStats && (
+            <CompareTradingDialog
+              isOpen={compareTradingDialogOpen}
+              onClose={() => setCompareTradingDialogOpen(false)}
+              baseStats={selectedBaseStats}
+              compareStats={selectedCompareStats}
+              onMerge={() => {
+                setCompareTradingDialogOpen(false);
+                fetchData();
+              }}
+              onVerificationChange={() => fetchData()}
+            />
           )}
 
           <CompareWeeklyAccordion weeks={weeks} onWeekMerged={handleWeekMerged} />
