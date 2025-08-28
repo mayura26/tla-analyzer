@@ -28,11 +28,6 @@ interface CompareTradingDialogProps {
 type SessionKey = keyof DailyStats['sessionBreakdown'];
 
 export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats, onMerge, onVerificationChange }: CompareTradingDialogProps) {
-  // Don't render if stats are not available
-  if (!baseStats || !compareStats) {
-    return null;
-  }
-  
   const [isVerified, setIsVerified] = useState(false);
   const [tagAssignments, setTagAssignments] = useState<TagAssignment[]>([]);
   const [baseDayNotes, setBaseDayNotes] = useState("");
@@ -180,6 +175,11 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
       loadExistingMetadata();
     }
   }, [isOpen, baseStats?.date]);
+
+  // Don't render if stats are not available
+  if (!baseStats || !compareStats) {
+    return null;
+  }
 
   const loadExistingMetadata = async () => {
     try {

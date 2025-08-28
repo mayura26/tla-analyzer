@@ -13,7 +13,6 @@ import { AlertCircle, ChevronDown, ChevronUp, DollarSign, Target, TrendingUp, Tr
 import { ComparisonStats } from "@/lib/trading-comparison-stats-processor";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BacktestManager } from "@/components/BacktestManager";
 import type { TagAssignment } from "@/lib/trading-data-store";
 
