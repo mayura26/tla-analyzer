@@ -61,18 +61,18 @@ export default function CompareViewPage() {
   const [backtestExpanded, setBacktestExpanded] = useState(false);
   const [tagAnalyticsExpanded, setTagAnalyticsExpanded] = useState(false);
   const [showOnlyUnverified, setShowOnlyUnverified] = useState(false);
-  const [selectedTagFilter, setSelectedTagFilter] = useState<string>('all');
+  const [selectedTagFilters, setSelectedTagFilters] = useState<string[]>([]);
   const [compareTradingDialogOpen, setCompareTradingDialogOpen] = useState(false);
   const [selectedBaseStats, setSelectedBaseStats] = useState<any>(null);
   const [selectedCompareStats, setSelectedCompareStats] = useState<any>(null);
 
   const fetchData = async () => {
     try {
-      const tagFilterParam = selectedTagFilter === 'all' ? '' : `&tagFilter=${selectedTagFilter}`;
+      const tagFilterParam = selectedTagFilters.length > 0 ? `&tagFilter=${selectedTagFilters.join(',')}` : '';
       const [weeksRes, statsRes, taggedDaysRes, tagDefinitionsRes] = await Promise.all([
         fetch(`/api/trading-data/compare${showOnlyUnverified ? '?unverifiedOnly=true' : ''}`),
         fetch(`/api/trading-data/compare/stats${showOnlyUnverified ? '?unverifiedOnly=true' : ''}`),
-        fetch(`/api/trading-data/compare/tags${showOnlyUnverified || selectedTagFilter !== 'all' ? '?' : ''}${showOnlyUnverified ? 'unverifiedOnly=true' : ''}${tagFilterParam}`),
+        fetch(`/api/trading-data/compare/tags${showOnlyUnverified || selectedTagFilters.length > 0 ? '?' : ''}${showOnlyUnverified ? 'unverifiedOnly=true' : ''}${tagFilterParam}`),
         fetch('/api/trading-data/tags')
       ]);
 
@@ -103,10 +103,12 @@ export default function CompareViewPage() {
       setWeeks(weeksData);
       setStats(statsData);
       setTaggedDays(taggedDaysData);
-      setTagDefinitions(tagDefinitionsData);
+      // Sort tag definitions alphabetically by name
+      const sortedTagDefinitions = tagDefinitionsData.sort((a: TagDefinition, b: TagDefinition) => a.name.localeCompare(b.name));
+      setTagDefinitions(sortedTagDefinitions);
       
       // Calculate tag analytics
-      calculateTagAnalytics(taggedDaysData, tagDefinitionsData);
+      calculateTagAnalytics(taggedDaysData, sortedTagDefinitions);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Failed to load comparison data");
     } finally {
@@ -208,7 +210,7 @@ export default function CompareViewPage() {
 
   useEffect(() => {
     fetchData();
-  }, [showOnlyUnverified, selectedTagFilter]);
+  }, [showOnlyUnverified, selectedTagFilters]);
 
   const handleWeekMerged = async () => {
     // Refresh the data after a week is merged
@@ -220,6 +222,24 @@ export default function CompareViewPage() {
         description: 'There was an error refreshing the comparison data.'
       });
     }
+  };
+
+  const handleTagFilterChange = (tagId: string) => {
+    setSelectedTagFilters(prev => {
+      if (prev.includes(tagId)) {
+        return prev.filter(id => id !== tagId);
+      } else {
+        return [...prev, tagId];
+      }
+    });
+  };
+
+  const handleSelectAllTags = () => {
+    setSelectedTagFilters(tagDefinitions.map(tag => tag.id));
+  };
+
+  const handleClearAllTags = () => {
+    setSelectedTagFilters([]);
   };
 
   const formatCurrency = (value: number) => {
@@ -312,26 +332,71 @@ export default function CompareViewPage() {
           <div className="flex items-center space-x-2">
             <Filter className="w-4 h-4 text-muted-foreground" />
             <Label htmlFor="tag-filter">Filter by tag:</Label>
-            <Select value={selectedTagFilter} onValueChange={setSelectedTagFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All tags</SelectItem>
-                {tagDefinitions.map(tag => (
-                  <SelectItem key={tag.id} value={tag.id}>
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: tag.color }}
-                      />
-                      {tag.name}
+            <div className="relative">
+              <Button
+                variant="outline"
+                className="w-48 justify-between"
+                onClick={() => setTagsExpanded(!tagsExpanded)}
+              >
+                <span>
+                  {selectedTagFilters.length === 0 
+                    ? "All tags" 
+                    : selectedTagFilters.length === 1 
+                      ? tagDefinitions.find(t => t.id === selectedTagFilters[0])?.name || "1 tag"
+                      : `${selectedTagFilters.length} tags selected`
+                  }
+                </span>
+                {tagsExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </Button>
+              
+              {tagsExpanded && (
+                <div className="absolute top-full left-0 mt-1 w-48 bg-background border rounded-md shadow-lg z-50 max-h-60 overflow-y-auto">
+                  <div className="p-2 border-b">
+                    <div className="flex gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSelectAllTags}
+                        className="flex-1 text-xs"
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleClearAllTags}
+                        className="flex-1 text-xs"
+                      >
+                        Clear All
+                      </Button>
                     </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedTagFilter !== 'all' && (
+                  </div>
+                  <div className="p-2">
+                    {tagDefinitions.map(tag => (
+                      <div key={tag.id} className="flex items-center gap-2 py-1">
+                        <input
+                          type="checkbox"
+                          id={`tag-${tag.id}`}
+                          checked={selectedTagFilters.includes(tag.id)}
+                          onChange={() => handleTagFilterChange(tag.id)}
+                          className="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded"
+                        />
+                        <label htmlFor={`tag-${tag.id}`} className="text-sm cursor-pointer flex-1">
+                          <div className="flex items-center gap-2">
+                            <div 
+                              className="w-3 h-3 rounded-full" 
+                              style={{ backgroundColor: tag.color }}
+                            />
+                            {tag.name}
+                          </div>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            {selectedTagFilters.length > 0 && (
               <Badge variant="secondary" className="ml-2">
                 {taggedDays.length} tagged days
               </Badge>

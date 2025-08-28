@@ -46,9 +46,15 @@ export async function GET(request: Request) {
 
     // Apply tag filter if specified
     if (tagFilter && tagFilter !== 'all') {
-      taggedDaysData = taggedDaysData.filter(day => 
-        day.tagAssignments.some(assignment => assignment.tagId === tagFilter)
-      );
+      // Split the tagFilter by comma to handle multiple tags
+      const tagIds = tagFilter.split(',').map(id => id.trim()).filter(id => id.length > 0);
+      
+      if (tagIds.length > 0) {
+        // Use OR logic: show days that have ANY of the selected tags
+        taggedDaysData = taggedDaysData.filter(day => 
+          day.tagAssignments.some(assignment => tagIds.includes(assignment.tagId))
+        );
+      }
     }
 
     // Sort by date, oldest first
