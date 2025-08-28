@@ -3,10 +3,10 @@ import { tradingDataStore } from '@/lib/trading-data-store';
 
 export async function GET(
   request: Request,
-  { params }: { params: { date: string } }
+  { params }: { params: Promise<{ date: string }> }
 ) {
   try {
-    const { date } = params;
+    const { date } = await params;
     
     if (!date) {
       return NextResponse.json(
@@ -42,8 +42,8 @@ export async function GET(
       // Keep original structures for reference
       baseAnalysis,
       compareAnalysis,
-      baseTradeList: baseAnalysis.tradeList || [],
-      compareTradeList: compareAnalysis.tradeList || []
+      baseTradeList: (baseAnalysis as any).tradeList || [],
+      compareTradeList: (compareAnalysis as any).tradeList || []
     });
   } catch (error) {
     console.error("Error in tagged-day GET:", error);
