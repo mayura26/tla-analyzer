@@ -1,34 +1,25 @@
 import { NextResponse } from 'next/server';
-import { tradingDataStore } from '@/lib/trading-data-store';
+import { promises as fs } from 'fs';
+import path from 'path';
 
-export async function GET(request: Request) {
+const dataFilePath = path.join(process.cwd(), 'data', 'replaced-compare-data.json');
+
+export async function GET() {
   try {
-    const { searchParams } = new URL(request.url);
-    const date = searchParams.get('date');
+    const fileContent = await fs.readFile(dataFilePath, 'utf-8');
+    const data = JSON.parse(fileContent);
     
-    if (date) {
-      // Get specific replaced comparison data for a date
-      const replacedData = await tradingDataStore.getReplacedCompareByDate(date);
-      
-      if (!replacedData) {
-        return NextResponse.json(
-          { error: 'Replaced comparison data not found for the specified date' },
-          { status: 404 }
-        );
-      }
-      
-      return NextResponse.json(replacedData);
+    // Handle both old format (array) and new format (wrapped object)
+    if (Array.isArray(data)) {
+      return NextResponse.json(data);
+    } else if (data && Array.isArray(data.data)) {
+      return NextResponse.json(data.data);
     } else {
-      // Get all replaced comparison data
-      const replacedData = await tradingDataStore.getReplacedCompareData();
-      return NextResponse.json(replacedData);
+      return NextResponse.json([]);
     }
   } catch (error) {
-    console.error("Error in replaced compare API:", error);
-    return NextResponse.json(
-      { error: "Failed to retrieve replaced comparison data" },
-      { status: 500 }
-    );
+    console.error('Error reading replaced compare data:', error);
+    return NextResponse.json({ error: 'Failed to read replaced compare data' }, { status: 500 });
   }
 }
 
@@ -37,19 +28,31 @@ export async function DELETE(request: Request) {
     const { date } = await request.json();
     
     if (!date) {
-      return NextResponse.json(
-        { error: 'Date parameter is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Date parameter is required' }, { status: 400 });
     }
 
-    const success = await tradingDataStore.deleteReplacedCompareByDate(date);
+    // Read existing data
+    const fileContent = await fs.readFile(dataFilePath, 'utf-8');
+    const data = JSON.parse(fileContent);
     
-    if (!success) {
-      return NextResponse.json(
-        { error: 'Replaced comparison data not found for the specified date' },
-        { status: 404 }
-      );
+    // Handle both formats
+    let items = Array.isArray(data) ? data : (data.data || []);
+    
+    // Remove the item
+    const initialLength = items.length;
+    items = items.filter(item => item.date !== date);
+    
+    if (items.length === initialLength) {
+      return NextResponse.json({ error: 'Replaced comparison data not found' }, { status: 404 });
+    }
+
+    // Write back to file (preserve original format)
+    if (Array.isArray(data)) {
+      await fs.writeFile(dataFilePath, JSON.stringify(items, null, 2));
+    } else {
+      data.data = items;
+      data.lastUpdated = new Date().toISOString();
+      await fs.writeFile(dataFilePath, JSON.stringify(data, null, 2));
     }
 
     return NextResponse.json({ 
@@ -57,9 +60,9 @@ export async function DELETE(request: Request) {
       message: 'Replaced comparison data successfully deleted' 
     });
   } catch (error) {
-    console.error("Error in replaced compare DELETE:", error);
+    console.error('Error deleting replaced comparison data:', error);
     return NextResponse.json(
-      { error: "Failed to delete replaced comparison data" },
+      { error: 'Failed to delete replaced comparison data' },
       { status: 500 }
     );
   }

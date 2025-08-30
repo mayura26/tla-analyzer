@@ -10,6 +10,7 @@ import { compareTradingLogs } from "@/lib/trading-log-comparator";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { TagAssignmentInterface } from "./TagAssignmentInterface";
 
 interface ReplacedCompareData {
   date: string;
@@ -326,6 +327,36 @@ export function ReplacedCompareDialog({
       toast.error("Failed to delete replaced comparison data");
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // Handle tag assignment changes for replaced compare data
+  const handleTagAssignmentsChange = async (tagAssignments: any[]) => {
+    if (!replacedData) return;
+    
+    try {
+      const response = await fetch('/api/trading-data/compare/replaced', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          date: replacedData.date,
+          tagAssignments: tagAssignments
+        }),
+      });
+
+      if (response.ok) {
+        toast.success('Tag assignments updated successfully');
+        // Refresh the replaced data to show updated tags
+        // You might want to add a callback prop to refresh the parent component
+      } else {
+        const error = await response.json();
+        toast.error(error.error || 'Failed to update tag assignments');
+      }
+    } catch (error) {
+      console.error('Error updating tag assignments:', error);
+      toast.error('Failed to update tag assignments');
     }
   };
 
@@ -1048,6 +1079,22 @@ export function ReplacedCompareDialog({
               )}
             </div>
           ) : null}
+
+          {/* Tag Management Section */}
+          <div className="space-y-4 mb-6">
+            <div className="text-lg font-semibold flex items-center gap-2">
+              <Tag className="w-5 h-5 text-muted-foreground" />
+              Manage Tags
+            </div>
+            <div className="bg-muted/30 rounded-lg p-4 border border-muted-foreground/20">
+              <TagAssignmentInterface
+                date={replacedData?.date || ''}
+                initialTagAssignments={replacedData?.metadata?.tagAssignments || []}
+                onTagAssignmentsChange={handleTagAssignmentsChange}
+                disabled={loadingTags}
+              />
+            </div>
+          </div>
 
           {/* Notes Section */}
           <div className="space-y-4">

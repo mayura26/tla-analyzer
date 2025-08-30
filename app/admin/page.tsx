@@ -549,6 +549,23 @@ export default function AdminPage() {
     setExpandedNodes(new Set());
   };
 
+  const fetchTagDefinitions = async () => {
+    try {
+      setLoadingTags(true);
+      const response = await fetch('/api/trading-data/tags');
+      if (response.ok) {
+        const tags = await response.json();
+        setTagDefinitions(tags);
+      } else {
+        console.error('Failed to load tag definitions');
+      }
+    } catch (error) {
+      console.error('Error loading tag definitions:', error);
+    } finally {
+      setLoadingTags(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-8">
