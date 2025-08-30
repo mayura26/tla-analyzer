@@ -36,6 +36,11 @@ interface ReplacedCompareData {
     replacedReason?: string;
     originalDate?: string;
     addedAt?: string;
+    tagAssignments?: Array<{
+      tagId: string;
+      impact: 'positive' | 'negative';
+      assignedAt: string;
+    }>;
   };
 }
 
@@ -49,6 +54,13 @@ interface CurrentCompareData {
       losses: number;
     };
     tradeList: TradeListEntry[];
+  };
+  metadata?: {
+    tagAssignments?: Array<{
+      tagId: string;
+      impact: 'positive' | 'negative';
+      assignedAt: string;
+    }>;
   };
 }
 
@@ -83,9 +95,16 @@ export default function AdminPage() {
   const [isReplacedCollapsed, setIsReplacedCollapsed] = useState(true); // Start collapsed
   const [isTagManagerCollapsed, setIsTagManagerCollapsed] = useState(true);
 
+  // Tag filtering state
+  const [tagDefinitions, setTagDefinitions] = useState<any[]>([]);
+  const [loadingTags, setLoadingTags] = useState(false);
+  const [selectedTagFilters, setSelectedTagFilters] = useState<Set<string>>(new Set());
+  const [filteredReplacedData, setFilteredReplacedData] = useState<ReplacedCompareData[]>([]);
+
   useEffect(() => {
     fetchFileInfo();
     fetchReplacedCompareData();
+    fetchTagDefinitions();
   }, []);
 
   const fetchFileInfo = async () => {
@@ -115,6 +134,11 @@ export default function AdminPage() {
         setReplacedCompareData(data);
         // Fetch current comparison data for each replaced item
         fetchCurrentCompareDataForReplaced(data);
+        
+        // Clear tag filters when data changes to avoid stale filter state
+        if (selectedTagFilters.size > 0) {
+          setSelectedTagFilters(new Set());
+        }
       } else {
         console.error('Failed to load replaced comparison data');
       }
@@ -123,6 +147,61 @@ export default function AdminPage() {
     } finally {
       setLoadingReplacedData(false);
     }
+  };
+
+  const fetchTagDefinitions = async () => {
+    try {
+      setLoadingTags(true);
+      const response = await fetch('/api/trading-data/tags');
+      if (response.ok) {
+        const tags = await response.json();
+        setTagDefinitions(tags);
+      } else {
+        console.error('Failed to load tag definitions');
+      }
+    } catch (error) {
+      console.error('Error loading tag definitions:', error);
+    } finally {
+      setLoadingTags(false);
+    }
+  };
+
+  // Filter replaced data based on selected tags
+  const getFilteredReplacedData = () => {
+    if (selectedTagFilters.size === 0) {
+      return replacedCompareData;
+    }
+    
+    return replacedCompareData.filter(item => {
+      // Check both replaced data tags and current data tags
+      const replacedTags = item.metadata?.tagAssignments || [];
+      const currentData = currentCompareDataMap.get(item.date);
+      const currentTags = currentData?.metadata?.tagAssignments || [];
+      
+      // Item matches if it has any of the selected tags in either source
+      return [...replacedTags, ...currentTags].some(assignment => 
+        selectedTagFilters.has(assignment.tagId)
+      );
+    });
+  };
+
+  // Get tag counts for the current replaced data
+  const getTagCounts = () => {
+    const counts: Record<string, number> = {};
+    
+    replacedCompareData.forEach(item => {
+      // Check both replaced data tags and current data tags
+      const replacedTags = item.metadata?.tagAssignments || [];
+      const currentData = currentCompareDataMap.get(item.date);
+      const currentTags = currentData?.metadata?.tagAssignments || [];
+      
+      // Count tags from both sources
+      [...replacedTags, ...currentTags].forEach(assignment => {
+        counts[assignment.tagId] = (counts[assignment.tagId] || 0) + 1;
+      });
+    });
+    
+    return counts;
   };
 
   const fetchCurrentCompareDataForReplaced = async (replacedData: ReplacedCompareData[]) => {
@@ -547,23 +626,6 @@ export default function AdminPage() {
 
   const collapseAllNodes = () => {
     setExpandedNodes(new Set());
-  };
-
-  const fetchTagDefinitions = async () => {
-    try {
-      setLoadingTags(true);
-      const response = await fetch('/api/trading-data/tags');
-      if (response.ok) {
-        const tags = await response.json();
-        setTagDefinitions(tags);
-      } else {
-        console.error('Failed to load tag definitions');
-      }
-    } catch (error) {
-      console.error('Error loading tag definitions:', error);
-    } finally {
-      setLoadingTags(false);
-    }
   };
 
   if (loading) {
@@ -1201,20 +1263,33 @@ export default function AdminPage() {
                   
                   {/* Calculate aggregated stats */}
                   {(() => {
-                    const totalOldPnl = replacedCompareData.reduce((sum, item) => sum + item.analysis.headline.totalPnl, 0);
-                    const totalNewPnl = Array.from(currentCompareDataMap.values()).reduce((sum, item) => sum + item.analysis.headline.totalPnl, 0);
+                    const filteredData = getFilteredReplacedData();
+                    const totalOldPnl = filteredData.reduce((sum, item) => sum + item.analysis.headline.totalPnl, 0);
+                    const totalNewPnl = filteredData.reduce((sum, item) => {
+                      const currentData = currentCompareDataMap.get(item.date);
+                      return sum + (currentData?.analysis.headline.totalPnl || 0);
+                    }, 0);
                     const totalPnlDiff = totalNewPnl - totalOldPnl;
                     
-                    const totalOldTrades = replacedCompareData.reduce((sum, item) => sum + item.analysis.headline.totalTrades, 0);
-                    const totalNewTrades = Array.from(currentCompareDataMap.values()).reduce((sum, item) => sum + item.analysis.headline.totalTrades, 0);
+                    const totalOldTrades = filteredData.reduce((sum, item) => sum + item.analysis.headline.totalTrades, 0);
+                    const totalNewTrades = filteredData.reduce((sum, item) => {
+                      const currentData = currentCompareDataMap.get(item.date);
+                      return sum + (currentData?.analysis.headline.totalTrades || 0);
+                    }, 0);
                     const totalTradesDiff = totalNewTrades - totalOldTrades;
                     
-                    const totalOldWins = replacedCompareData.reduce((sum, item) => sum + item.analysis.headline.wins, 0);
-                    const totalNewWins = Array.from(currentCompareDataMap.values()).reduce((sum, item) => sum + item.analysis.headline.wins, 0);
+                    const totalOldWins = filteredData.reduce((sum, item) => sum + item.analysis.headline.wins, 0);
+                    const totalNewWins = filteredData.reduce((sum, item) => {
+                      const currentData = currentCompareDataMap.get(item.date);
+                      return sum + (currentData?.analysis.headline.wins || 0);
+                    }, 0);
                     const totalWinsDiff = totalNewWins - totalOldWins;
                     
-                    const totalOldLosses = replacedCompareData.reduce((sum, item) => sum + item.analysis.headline.losses, 0);
-                    const totalNewLosses = Array.from(currentCompareDataMap.values()).reduce((sum, item) => sum + item.analysis.headline.losses, 0);
+                    const totalOldLosses = filteredData.reduce((sum, item) => sum + item.analysis.headline.losses, 0);
+                    const totalNewLosses = filteredData.reduce((sum, item) => {
+                      const currentData = currentCompareDataMap.get(item.date);
+                      return sum + (currentData?.analysis.headline.losses || 0);
+                    }, 0);
                     const totalLossesDiff = totalNewLosses - totalOldLosses;
                     
                     return (
@@ -1246,9 +1321,14 @@ export default function AdminPage() {
                               {formatCurrency(totalPnlDiff)}
                             </span>
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {replacedCompareData.length} replaced items
-                          </div>
+                                                      <div className="text-xs text-muted-foreground">
+                              {filteredData.length} replaced items
+                              {selectedTagFilters.size > 0 && (
+                                <span className="text-muted-foreground/70">
+                                  {" "}(filtered)
+                                </span>
+                              )}
+                            </div>
                         </div>
 
                         {/* Total Trades Difference */}
@@ -1320,7 +1400,14 @@ export default function AdminPage() {
                           <div className="space-y-1 text-sm">
                             <div className="flex justify-between">
                               <span>Items:</span>
-                              <span className="font-medium">{replacedCompareData.length}</span>
+                              <span className="font-medium">
+                                {filteredData.length}
+                                {selectedTagFilters.size > 0 && (
+                                  <span className="text-muted-foreground/70">
+                                    {" "}(of {replacedCompareData.length})
+                                  </span>
+                                )}
+                              </span>
                             </div>
                             <div className="flex justify-between">
                               <span>Old Total:</span>
@@ -1341,10 +1428,122 @@ export default function AdminPage() {
                   })()}
                 </div>
 
+                {/* Tag Filter Section */}
+                <div className="bg-muted/20 rounded-lg p-4 border border-muted-foreground/20">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <Tag className="h-5 w-5" />
+                      Filter by Tags
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      {selectedTagFilters.size > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedTagFilters(new Set())}
+                          className="text-xs"
+                        >
+                          Clear Filters
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          fetchReplacedCompareData();
+                          setSelectedTagFilters(new Set());
+                        }}
+                        className="text-xs"
+                        title="Refresh tag data and clear filters"
+                      >
+                        <Loader2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {loadingTags ? (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm text-muted-foreground">Loading tags...</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="text-sm text-muted-foreground">
+                        {selectedTagFilters.size === 0 
+                          ? "Select tags to filter replaced comparison data" 
+                          : `Showing items with ${selectedTagFilters.size} selected tag${selectedTagFilters.size !== 1 ? 's' : ''}`
+                        }
+                        {selectedTagFilters.size > 0 && (
+                          <span className="block mt-1 text-xs text-amber-600 dark:text-amber-400">
+                            💡 Tip: Use the refresh button to update tag data after making changes
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-2">
+                        {tagDefinitions.map((tag) => {
+                          const isSelected = selectedTagFilters.has(tag.id);
+                          const tagCounts = getTagCounts();
+                          const itemCount = tagCounts[tag.id] || 0;
+                          
+                          return (
+                            <button
+                              key={tag.id}
+                              onClick={() => {
+                                const newFilters = new Set(selectedTagFilters);
+                                if (isSelected) {
+                                  newFilters.delete(tag.id);
+                                } else {
+                                  newFilters.add(tag.id);
+                                }
+                                setSelectedTagFilters(newFilters);
+                              }}
+                              className={`px-3 py-2 rounded-lg border text-sm font-medium transition-all ${
+                                isSelected
+                                  ? 'bg-primary text-primary-foreground border-primary'
+                                  : 'bg-background text-foreground border-muted-foreground/30 hover:bg-muted/50'
+                              }`}
+                              style={isSelected ? {} : { borderColor: tag.color + '40', backgroundColor: tag.color + '10' }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div 
+                                  className="w-3 h-3 rounded-full" 
+                                  style={{ backgroundColor: tag.color }}
+                                />
+                                <span>{tag.name}</span>
+                                <Badge variant="secondary" className="text-xs">
+                                  {itemCount}
+                                </Badge>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      
+                                             {selectedTagFilters.size > 0 && (
+                         <div className="text-sm text-muted-foreground">
+                           Filtered results: {getFilteredReplacedData().length} of {replacedCompareData.length} items
+                         </div>
+                       )}
+                       
+                       
+                    </div>
+                  )}
+                </div>
+
                 {/* Individual Items */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold">Replaced Comparisons ({replacedCompareData.length})</h3>
+                    <h3 className="font-semibold">
+                      Replaced Comparisons ({getFilteredReplacedData().length})
+                      {selectedTagFilters.size > 0 && (
+                        <span className="text-sm font-normal text-muted-foreground ml-2">
+                          (filtered from {replacedCompareData.length})
+                        </span>
+                      )}
+                    </h3>
                     <Button
                       variant="outline"
                       size="sm"
@@ -1359,7 +1558,8 @@ export default function AdminPage() {
                   <div className="space-y-6 max-h-96 overflow-y-auto">
                     {(() => {
                       // Group items by month
-                      const groupedByMonth = replacedCompareData.reduce((groups, item) => {
+                      const filteredData = getFilteredReplacedData();
+                      const groupedByMonth = filteredData.reduce((groups, item) => {
                         const date = new Date(item.date);
                         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
                         const monthLabel = date.toLocaleDateString('en-US', { 
@@ -1736,6 +1936,7 @@ export default function AdminPage() {
         }}
         replacedData={selectedReplacedData}
         onDelete={handleReplacedDataDelete}
+        onDataUpdate={fetchReplacedCompareData}
       />
     </div>
   );

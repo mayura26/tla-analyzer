@@ -63,6 +63,7 @@ interface ReplacedCompareDialogProps {
   onClose: () => void;
   replacedData: ReplacedCompareData | null;
   onDelete?: () => void;
+  onDataUpdate?: () => void;
 }
 
 interface TagDefinition {
@@ -79,7 +80,8 @@ export function ReplacedCompareDialog({
   isOpen, 
   onClose, 
   replacedData, 
-  onDelete 
+  onDelete,
+  onDataUpdate
 }: ReplacedCompareDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [markedTrades, setMarkedTrades] = useState<Set<string>>(new Set());
@@ -349,7 +351,9 @@ export function ReplacedCompareDialog({
       if (response.ok) {
         toast.success('Tag assignments updated successfully');
         // Refresh the replaced data to show updated tags
-        // You might want to add a callback prop to refresh the parent component
+        if (onDataUpdate) {
+          onDataUpdate();
+        }
       } else {
         const error = await response.json();
         toast.error(error.error || 'Failed to update tag assignments');
