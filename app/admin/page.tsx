@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Download, Upload, FileText, Database, Loader2, Trash2, History, Eye, BarChart3, ChevronDown, ChevronRight, Tag } from "lucide-react";
+import { Download, Upload, FileText, Database, Loader2, Trash2, History, Eye, BarChart3, ChevronDown, ChevronRight, Tag, DollarSign, TrendingUp, TrendingDown, Target } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ReplacedCompareDialog } from "@/components/ReplacedCompareDialog";
 import { TradeListEntry } from "@/lib/trading-log-parser";
@@ -1132,7 +1132,7 @@ export default function AdminPage() {
         </Card>
 
         {/* Replaced Comparison Data Section */}
-        <Card>
+        <Card className="col-span-full">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -1159,7 +1159,7 @@ export default function AdminPage() {
             </div>
           </CardHeader>
           {!isReplacedCollapsed && (
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
             {loadingReplacedData ? (
               <div className="flex items-center justify-center py-8">
                 <div className="flex items-center gap-2">
@@ -1174,122 +1174,368 @@ export default function AdminPage() {
                 <p className="text-sm">Replaced comparisons will appear here when significant differences are detected</p>
               </div>
             ) : (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">Replaced Comparisons ({replacedCompareData.length})</h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={fetchReplacedCompareData}
-                    disabled={loadingReplacedData}
-                  >
-                    <Loader2 className={`h-4 w-4 mr-2 ${loadingReplacedData ? 'animate-spin' : 'hidden'}`} />
-                    Refresh
-                  </Button>
-                </div>
-                
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {replacedCompareData.map((item) => {
-                    const currentData = currentCompareDataMap.get(item.date);
-                    const isLoadingCurrent = loadingCurrentDataMap.has(item.date);
-                    const oldPnl = item.analysis.headline.totalPnl;
-                    const newPnl = currentData?.analysis.headline.totalPnl;
-                    const pnlDifference = newPnl !== undefined ? newPnl - oldPnl : undefined;
-
+              <>
+                {/* Summary Section */}
+                <div className="bg-muted/30 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Summary Across All Replaced Items
+                  </h3>
+                  
+                  {/* Calculate aggregated stats */}
+                  {(() => {
+                    const totalOldPnl = replacedCompareData.reduce((sum, item) => sum + item.analysis.headline.totalPnl, 0);
+                    const totalNewPnl = Array.from(currentCompareDataMap.values()).reduce((sum, item) => sum + item.analysis.headline.totalPnl, 0);
+                    const totalPnlDiff = totalNewPnl - totalOldPnl;
+                    
+                    const totalOldTrades = replacedCompareData.reduce((sum, item) => sum + item.analysis.headline.totalTrades, 0);
+                    const totalNewTrades = Array.from(currentCompareDataMap.values()).reduce((sum, item) => sum + item.analysis.headline.totalTrades, 0);
+                    const totalTradesDiff = totalNewTrades - totalOldTrades;
+                    
+                    const totalOldWins = replacedCompareData.reduce((sum, item) => sum + item.analysis.headline.wins, 0);
+                    const totalNewWins = Array.from(currentCompareDataMap.values()).reduce((sum, item) => sum + item.analysis.headline.wins, 0);
+                    const totalWinsDiff = totalNewWins - totalOldWins;
+                    
+                    const totalOldLosses = replacedCompareData.reduce((sum, item) => sum + item.analysis.headline.losses, 0);
+                    const totalNewLosses = Array.from(currentCompareDataMap.values()).reduce((sum, item) => sum + item.analysis.headline.losses, 0);
+                    const totalLossesDiff = totalNewLosses - totalOldLosses;
+                    
                     return (
-                      <div
-                        key={`${item.date}-${item.metadata?.replacedAt}`}
-                        className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
-                        onClick={() => handleReplacedDataClick(item)}
-                      >
-                        <div className="flex items-center justify-between mb-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {/* Total PnL Difference */}
+                        <div className={`space-y-2 p-4 rounded-lg border ${getPnlColor(totalPnlDiff) === 'text-green-600' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-sm font-medium text-muted-foreground">Total PnL Change</span>
+                            </div>
+                            {totalPnlDiff !== 0 && (
+                              <div className="flex items-center gap-1 text-xs font-medium">
+                                {totalPnlDiff > 0 ? (
+                                  <span className="text-green-600">+{formatCurrency(totalPnlDiff)}</span>
+                                ) : (
+                                  <span className="text-red-600">{formatCurrency(totalPnlDiff)}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="text-xs">
-                              {item.date}
-                            </Badge>
-                            <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
-                              Replaced
-                            </Badge>
+                            {totalPnlDiff >= 0 ? (
+                              <TrendingUp className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <TrendingDown className="h-5 w-5 text-red-600" />
+                            )}
+                            <span className={`text-2xl font-bold ${getPnlColor(totalPnlDiff)}`}>
+                              {formatCurrency(totalPnlDiff)}
+                            </span>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <div title="View details">
-                              <Eye 
-                                className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" 
-                              />
-                            </div>
-                            <button
-                              onClick={(e) => handleDeleteReplacedData(item, e)}
-                              className="h-6 w-6 text-muted-foreground hover:text-red-600 hover:bg-red-50 hover:border-red-200 cursor-pointer transition-colors border border-muted-foreground/20 rounded flex items-center justify-center shadow-sm hover:shadow-md"
-                              title="Delete replaced comparison data"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M18 6 6 18" />
-                                <path d="m6 6 12 12" />
-                              </svg>
-                            </button>
+                          <div className="text-xs text-muted-foreground">
+                            {replacedCompareData.length} replaced items
                           </div>
                         </div>
-                        
-                        {/* PnL Comparison */}
-                        <div className="mb-2">
-                          <div className="grid grid-cols-3 gap-2 text-sm">
-                            <div className="text-center">
-                              <div className="text-xs text-muted-foreground mb-1">Old PnL</div>
-                              <div className={`font-medium ${getPnlColor(oldPnl)}`}>
-                                {formatCurrency(oldPnl)}
+
+                        {/* Total Trades Difference */}
+                        <div className={`space-y-2 p-4 rounded-lg border ${totalTradesDiff >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Target className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-sm font-medium text-muted-foreground">Total Trades Change</span>
+                            </div>
+                            {totalTradesDiff !== 0 && (
+                              <div className="flex items-center gap-1 text-xs font-medium">
+                                {totalTradesDiff > 0 ? (
+                                  <span className="text-blue-600">+{totalTradesDiff}</span>
+                                ) : (
+                                  <span className="text-orange-600">{totalTradesDiff}</span>
+                                )}
                               </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-2xl font-bold ${totalTradesDiff >= 0 ? 'text-blue-500' : 'text-orange-500'}`}>
+                              {totalTradesDiff >= 0 ? '+' : ''}{totalTradesDiff}
+                            </span>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {totalOldTrades} → {totalNewTrades} trades
+                          </div>
+                        </div>
+
+                        {/* Win/Loss Breakdown */}
+                        <div className={`space-y-2 p-4 rounded-lg border ${totalWinsDiff >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Target className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-sm font-medium text-muted-foreground">Win/Loss Change</span>
+                            </div>
+                            {totalWinsDiff !== 0 && (
+                              <div className="flex items-center gap-1 text-xs font-medium">
+                                {totalWinsDiff > 0 ? (
+                                  <span className="text-green-600">+{totalWinsDiff}</span>
+                                ) : (
+                                  <span className="text-red-600">{totalWinsDiff}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-center">
+                              <div className="text-lg font-bold text-green-500">
+                                {totalWinsDiff >= 0 ? '+' : ''}{totalWinsDiff}
+                              </div>
+                              <div className="text-xs text-muted-foreground">Wins</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-xs text-muted-foreground mb-1">New PnL</div>
-                              <div className={`font-medium ${isLoadingCurrent ? 'text-muted-foreground' : newPnl !== undefined ? getPnlColor(newPnl) : 'text-muted-foreground'}`}>
-                                {isLoadingCurrent ? 'Loading...' : newPnl !== undefined ? formatCurrency(newPnl) : 'N/A'}
+                              <div className="text-lg font-bold text-red-500">
+                                {totalLossesDiff >= 0 ? '+' : ''}{totalLossesDiff}
                               </div>
-                            </div>
-                            <div className="text-center">
-                              <div className="text-xs text-muted-foreground mb-1">Difference</div>
-                              <div className={`font-medium ${isLoadingCurrent ? 'text-muted-foreground' : pnlDifference !== undefined ? getPnlColor(pnlDifference) : 'text-muted-foreground'}`}>
-                                {isLoadingCurrent ? 'Loading...' : pnlDifference !== undefined ? formatCurrency(pnlDifference) : 'N/A'}
-                              </div>
+                              <div className="text-xs text-muted-foreground">Losses</div>
                             </div>
                           </div>
                         </div>
-                        
-                        {/* Other Stats */}
-                        <div className="grid grid-cols-3 gap-2 text-sm">
-                          <div>
-                            <span className="text-muted-foreground">Trades:</span>
-                            <span className="ml-1 font-medium">{item.analysis.headline.totalTrades}</span>
+
+                        {/* Summary Stats */}
+                        <div className="space-y-2 p-4 rounded-lg border bg-muted/50">
+                          <div className="flex items-center gap-2">
+                            <BarChart3 className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm font-medium text-muted-foreground">Summary</span>
                           </div>
-                          <div>
-                            <span className="text-muted-foreground">Wins:</span>
-                            <span className="ml-1 font-medium text-green-600">{item.analysis.headline.wins}</span>
-                          </div>
-                          <div>
-                            <span className="text-muted-foreground">Losses:</span>
-                            <span className="ml-1 font-medium text-red-600">{item.analysis.headline.losses}</span>
+                          <div className="space-y-1 text-sm">
+                            <div className="flex justify-between">
+                              <span>Items:</span>
+                              <span className="font-medium">{replacedCompareData.length}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>Old Total:</span>
+                              <span className={`font-medium ${getPnlColor(totalOldPnl)}`}>
+                                {formatCurrency(totalOldPnl)}
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>New Total:</span>
+                              <span className={`font-medium ${getPnlColor(totalNewPnl)}`}>
+                                {formatCurrency(totalNewPnl)}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                        
-                        {item.metadata?.replacedAt && (
-                          <div className="text-xs text-muted-foreground mt-2">
-                            Replaced: {new Date(item.metadata.replacedAt).toLocaleString()}
-                          </div>
-                        )}
                       </div>
                     );
-                  })}
+                  })()}
                 </div>
-              </div>
+
+                {/* Individual Items */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">Replaced Comparisons ({replacedCompareData.length})</h3>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={fetchReplacedCompareData}
+                      disabled={loadingReplacedData}
+                    >
+                      <Loader2 className={`h-4 w-4 mr-2 ${loadingReplacedData ? 'animate-spin' : 'hidden'}`} />
+                      Refresh
+                    </Button>
+                  </div>
+                  
+                  <div className="space-y-6 max-h-96 overflow-y-auto">
+                    {(() => {
+                      // Group items by month
+                      const groupedByMonth = replacedCompareData.reduce((groups, item) => {
+                        const date = new Date(item.date);
+                        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                        const monthLabel = date.toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'long' 
+                        });
+                        
+                        if (!groups[monthKey]) {
+                          groups[monthKey] = {
+                            monthLabel,
+                            items: []
+                          };
+                        }
+                        groups[monthKey].items.push(item);
+                        return groups;
+                      }, {} as Record<string, { monthLabel: string; items: ReplacedCompareData[] }>);
+
+                      // Sort months chronologically (newest first)
+                      const sortedMonths = Object.entries(groupedByMonth)
+                        .sort(([a], [b]) => b.localeCompare(a));
+
+                      return sortedMonths.map(([monthKey, { monthLabel, items }]) => (
+                        <div key={monthKey} className="space-y-3">
+                          {/* Month Header */}
+                          <div className="flex items-center gap-3">
+                            <div className="h-px flex-1 bg-border"></div>
+                            <h4 className="text-lg font-semibold text-muted-foreground px-4 py-2 bg-muted/50 rounded-lg">
+                              {monthLabel} ({items.length} item{items.length !== 1 ? 's' : ''})
+                            </h4>
+                            <div className="h-px flex-1 bg-border"></div>
+                          </div>
+                          
+                          {/* Month Summary */}
+                          <div className="bg-muted/20 rounded-lg p-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                              {(() => {
+                                const monthOldPnl = items.reduce((sum, item) => sum + item.analysis.headline.totalPnl, 0);
+                                const monthNewPnl = items.reduce((sum, item) => {
+                                  const currentData = currentCompareDataMap.get(item.date);
+                                  return sum + (currentData?.analysis.headline.totalPnl || 0);
+                                }, 0);
+                                const monthPnlDiff = monthNewPnl - monthOldPnl;
+                                
+                                const monthOldTrades = items.reduce((sum, item) => sum + item.analysis.headline.totalTrades, 0);
+                                const monthNewTrades = items.reduce((sum, item) => {
+                                  const currentData = currentCompareDataMap.get(item.date);
+                                  return sum + (currentData?.analysis.headline.totalTrades || 0);
+                                }, 0);
+                                const monthTradesDiff = monthNewTrades - monthOldTrades;
+                                
+                                return (
+                                  <>
+                                    <div className="text-center">
+                                      <div className="text-xs text-muted-foreground mb-1">Month PnL Change</div>
+                                      <div className={`font-medium text-lg ${getPnlColor(monthPnlDiff)}`}>
+                                        {formatCurrency(monthPnlDiff)}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {formatCurrency(monthOldPnl)} → {formatCurrency(monthNewPnl)}
+                                      </div>
+                                    </div>
+                                    <div className="text-center">
+                                      <div className="text-xs text-muted-foreground mb-1">Month Trades Change</div>
+                                      <div className={`font-medium text-lg ${monthTradesDiff >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>
+                                        {monthTradesDiff >= 0 ? '+' : ''}{monthTradesDiff}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {monthOldTrades} → {monthNewTrades} trades
+                                      </div>
+                                    </div>
+                                    <div className="text-center">
+                                      <div className="text-xs text-muted-foreground mb-1">Items in Month</div>
+                                      <div className="font-medium text-lg text-foreground">
+                                        {items.length}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {items.length === 1 ? 'Replaced item' : 'Replaced items'}
+                                      </div>
+                                    </div>
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                          
+                          {/* Items Grid for this month */}
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {items.map((item) => {
+                              const currentData = currentCompareDataMap.get(item.date);
+                              const isLoadingCurrent = loadingCurrentDataMap.has(item.date);
+                              const oldPnl = item.analysis.headline.totalPnl;
+                              const newPnl = currentData?.analysis.headline.totalPnl;
+                              const pnlDifference = newPnl !== undefined ? newPnl - oldPnl : undefined;
+
+                              return (
+                                <div
+                                  key={`${item.date}-${item.metadata?.replacedAt}`}
+                                  className="p-3 border rounded-lg hover:bg-muted/50 cursor-pointer transition-colors"
+                                  onClick={() => handleReplacedDataClick(item)}
+                                >
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <Badge variant="secondary" className="text-xs">
+                                        {item.date}
+                                      </Badge>
+                                      <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
+                                        Replaced
+                                      </Badge>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <div title="View details">
+                                        <Eye 
+                                          className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-pointer transition-colors" 
+                                        />
+                                      </div>
+                                      <button
+                                        onClick={(e) => handleDeleteReplacedData(item, e)}
+                                        className="h-6 w-6 text-muted-foreground hover:text-red-600 hover:bg-red-50 hover:border-red-200 cursor-pointer transition-colors border border-muted-foreground/20 rounded flex items-center justify-center shadow-sm hover:shadow-md"
+                                        title="Delete replaced comparison data"
+                                      >
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          width="14"
+                                          height="14"
+                                          viewBox="0 0 24 24"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          strokeWidth="2"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        >
+                                          <path d="M18 6 6 18" />
+                                          <path d="m6 6 12 12" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* PnL Comparison */}
+                                  <div className="mb-2">
+                                    <div className="grid grid-cols-3 gap-2 text-sm">
+                                      <div className="text-center">
+                                        <div className="text-xs text-muted-foreground mb-1">Old PnL</div>
+                                        <div className={`font-medium ${getPnlColor(oldPnl)}`}>
+                                          {formatCurrency(oldPnl)}
+                                        </div>
+                                      </div>
+                                      <div className="text-center">
+                                        <div className="text-xs text-muted-foreground mb-1">New PnL</div>
+                                        <div className={`font-medium ${isLoadingCurrent ? 'text-muted-foreground' : newPnl !== undefined ? getPnlColor(newPnl) : 'text-muted-foreground'}`}>
+                                          {isLoadingCurrent ? 'Loading...' : newPnl !== undefined ? formatCurrency(newPnl) : 'N/A'}
+                                        </div>
+                                      </div>
+                                      <div className="text-center">
+                                        <div className="text-xs text-muted-foreground mb-1">Difference</div>
+                                        <div className={`font-medium ${isLoadingCurrent ? 'text-muted-foreground' : pnlDifference !== undefined ? getPnlColor(pnlDifference) : 'text-muted-foreground'}`}>
+                                          {isLoadingCurrent ? 'Loading...' : pnlDifference !== undefined ? formatCurrency(pnlDifference) : 'N/A'}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  {/* Other Stats */}
+                                  <div className="grid grid-cols-3 gap-2 text-sm">
+                                    <div>
+                                      <span className="text-muted-foreground">Trades:</span>
+                                      <span className="ml-1 font-medium">{item.analysis.headline.totalTrades}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Wins:</span>
+                                      <span className="ml-1 font-medium text-green-600">{item.analysis.headline.wins}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Losses:</span>
+                                      <span className="ml-1 font-medium text-red-600">{item.analysis.headline.losses}</span>
+                                    </div>
+                                  </div>
+                                  
+                                  {item.metadata?.replacedAt && (
+                                    <div className="text-xs text-muted-foreground mt-2">
+                                      Replaced: {new Date(item.metadata.replacedAt).toLocaleString()}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </>
             )}
           </CardContent>)}
         </Card>
