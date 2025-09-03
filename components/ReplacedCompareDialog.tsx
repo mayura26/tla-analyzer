@@ -833,11 +833,17 @@ export function ReplacedCompareDialog({
       { trades: currentTrades, dailyStats: currentCompareData.analysis.headline as any }
     );
 
-    // Compute the set of trade keys that actually require review (added, removed, modified)
+    // Filter modified trades to only include those with PnL differences
+    const modifiedTradesWithPnlDiff = comparison.differences.trades.modified.filter(({ changes }) => {
+      const pnlChange = changes.find(change => change.field === 'totalPnl');
+      return pnlChange !== undefined;
+    });
+
+    // Compute the set of trade keys that actually require review (added, removed, modified with PnL changes)
     const reviewTradeKeys = [
       ...comparison.differences.trades.added.map(getTradeKey),
       ...comparison.differences.trades.removed.map(getTradeKey),
-      ...comparison.differences.trades.modified.map(({ trade }) => getTradeKey(trade)),
+      ...modifiedTradesWithPnlDiff.map(({ trade }) => getTradeKey(trade)),
     ];
     const reviewedCount = reviewTradeKeys.filter(key => markedTrades.has(key)).length;
     const totalTrades = reviewTradeKeys.length;
@@ -891,11 +897,22 @@ export function ReplacedCompareDialog({
           </div>
         )}
 
-        {comparison.differences.trades.modified.length > 0 && (
+        {(() => {
+          // Filter modified trades to only show those with PnL differences
+          const modifiedTradesWithPnlDiff = comparison.differences.trades.modified.filter(({ changes }) => {
+            // Check if there's a PnL change in the changes
+            const pnlChange = changes.find(change => change.field === 'totalPnl');
+            return pnlChange !== undefined;
+          });
+
+          if (modifiedTradesWithPnlDiff.length > 0) {
+            return (
           <div>
-            <div className="text-sm font-medium mb-2">Modified Trades</div>
+                <div className="text-sm font-medium mb-2">
+                  Modified Trades with PnL Changes ({modifiedTradesWithPnlDiff.length})
+                </div>
             <div className="space-y-2">
-              {comparison.differences.trades.modified
+                  {modifiedTradesWithPnlDiff
                 .sort((a, b) => {
                   const timeA = a.trade.timestamp instanceof Date 
                     ? a.trade.timestamp.getTime() 
@@ -908,7 +925,32 @@ export function ReplacedCompareDialog({
                 .map(({ trade, changes }) => renderTrade(trade, true, changes))}
             </div>
           </div>
-        )}
+            );
+          }
+          return null;
+        })()}
+
+        {/* Show count of modified trades without PnL differences */}
+        {(() => {
+          const modifiedTradesWithoutPnlDiff = comparison.differences.trades.modified.filter(({ changes }) => {
+            const pnlChange = changes.find(change => change.field === 'totalPnl');
+            return pnlChange === undefined;
+          }).length;
+
+          if (modifiedTradesWithoutPnlDiff > 0) {
+            return (
+              <div>
+                <div className="text-sm font-medium mb-2 text-muted-foreground">
+                  Modified Trades without PnL Changes ({modifiedTradesWithoutPnlDiff})
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    (Hidden - only showing trades with PnL differences)
+                  </span>
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {comparison.differences.trades.idOnlyChanged.length > 0 && (
           <div>
@@ -932,6 +974,26 @@ export function ReplacedCompareDialog({
 
   if (!replacedData) {
     return null;
+  }
+
+  // Defensive check for required data structure
+  if (!replacedData.analysis || !replacedData.analysis.headline) {
+    console.error('Invalid replaced data structure:', replacedData);
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Error</DialogTitle>
+          </DialogHeader>
+          <div className="p-4 text-center">
+            <p className="text-red-500">Invalid data structure for replaced comparison.</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              The replaced data is missing required analysis information.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
   }
 
   return (

@@ -2,21 +2,35 @@ import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
 
+interface ReplacedCompareItem {
+  date: string;
+  [key: string]: any;
+}
+
 const dataFilePath = path.join(process.cwd(), 'data', 'replaced-compare-data.json');
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const date = searchParams.get('date');
+    
     const fileContent = await fs.readFile(dataFilePath, 'utf-8');
     const data = JSON.parse(fileContent);
     
     // Handle both old format (array) and new format (wrapped object)
-    if (Array.isArray(data)) {
-      return NextResponse.json(data);
-    } else if (data && Array.isArray(data.data)) {
-      return NextResponse.json(data.data);
-    } else {
-      return NextResponse.json([]);
+    const items: ReplacedCompareItem[] = Array.isArray(data) ? data : (data.data || []);
+    
+    // If date parameter is provided, filter by date
+    if (date) {
+      const filteredItem = items.find((item: ReplacedCompareItem) => item.date === date);
+      if (!filteredItem) {
+        return NextResponse.json({ error: 'Replaced comparison data not found for the specified date' }, { status: 404 });
+      }
+      return NextResponse.json(filteredItem);
     }
+    
+    // If no date parameter, return all items
+    return NextResponse.json(items);
   } catch (error) {
     console.error('Error reading replaced compare data:', error);
     return NextResponse.json({ error: 'Failed to read replaced compare data' }, { status: 500 });
@@ -36,11 +50,11 @@ export async function DELETE(request: Request) {
     const data = JSON.parse(fileContent);
     
     // Handle both formats
-    let items = Array.isArray(data) ? data : (data.data || []);
+    let items: ReplacedCompareItem[] = Array.isArray(data) ? data : (data.data || []);
     
     // Remove the item
     const initialLength = items.length;
-    items = items.filter(item => item.date !== date);
+    items = items.filter((item: ReplacedCompareItem) => item.date !== date);
     
     if (items.length === initialLength) {
       return NextResponse.json({ error: 'Replaced comparison data not found' }, { status: 404 });

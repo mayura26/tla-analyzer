@@ -275,69 +275,7 @@ export default function ComparePage() {
     return undefined;
   };
 
-  // Function to render tag assignments
-  const renderTagAssignments = (tagAssignments: any[]) => {
-    if (!tagAssignments || tagAssignments.length === 0) return null;
 
-    return (
-      <div className="flex flex-wrap gap-1">
-        {tagAssignments.map((assignment) => {
-          const tagDef = getTagDefinition(assignment.tagId);
-          
-          if (!tagDef) {
-            return null;
-          }
-          
-          return (
-            <HoverCard key={assignment.tagId}>
-              <HoverCardTrigger asChild>
-                <Badge
-                  variant="outline"
-                  className="flex items-center gap-1 cursor-help text-xs"
-                  style={{ 
-                    borderColor: tagDef.color + '40', 
-                    backgroundColor: tagDef.color + '10' 
-                  }}
-                >
-                  <Tag className="w-2 h-2" style={{ color: tagDef.color }} />
-                  <span style={{ color: tagDef.color }}>{tagDef.name}</span>
-                  {assignment.impact === 'positive' ? (
-                    <TrendingUp className="w-2 h-2 text-green-500" />
-                  ) : (
-                    <TrendingDown className="w-2 h-2 text-red-500" />
-                  )}
-                </Badge>
-              </HoverCardTrigger>
-              <HoverCardContent className="w-80 p-3">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div 
-                      className="w-4 h-4 rounded-full" 
-                      style={{ backgroundColor: tagDef.color }}
-                    />
-                    <span className="font-semibold">{tagDef.name}</span>
-                  </div>
-                  {tagDef.description && (
-                    <p className="text-sm text-muted-foreground">{tagDef.description}</p>
-                  )}
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span>Impact: {assignment.impact}</span>
-                    <span>Assigned: {new Date(assignment.assignedAt).toLocaleDateString()}</span>
-                  </div>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span>Usage: {tagDef.usageCount} times</span>
-                    {tagDef.lastUsed && (
-                      <span>Last used: {new Date(tagDef.lastUsed).toLocaleDateString()}</span>
-                    )}
-                  </div>
-                </div>
-              </HoverCardContent>
-            </HoverCard>
-          );
-        })}
-      </div>
-    );
-  };
 
   // Function to fetch and open replaced comparison dialog
   const handleViewReplacedCompare = async (submission: SubmissionLog) => {
@@ -679,74 +617,30 @@ export default function ComparePage() {
                   <h3 className="text-sm font-medium text-muted-foreground">Recent Submissions</h3>
                   <div className="space-y-1">
                     {submissionLog.map((log) => (
-                      <div key={log.id}>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Badge variant="secondary" className="text-xs">
+                      <div key={log.id} className="border rounded-lg p-3 bg-card">
+                        {/* Header row with date, status badges, and time */}
+                        <div className="flex items-center gap-2 text-sm mb-2 flex-wrap">
+                          <Badge variant="secondary" className="text-xs shrink-0">
                             {log.dataDate ? `${log.dataDate} (${new Date(log.dataDate).toLocaleDateString('en-US', { weekday: 'short' })})` : log.date}
                           </Badge>
                           {log.hadExistingCompare && (
-                            <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
+                            <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300 shrink-0">
                               Updated
                             </Badge>
                           )}
                           {log.wasReplaced && (
-                            <Badge variant="outline" className="text-xs bg-red-100 text-red-800 border-red-300">
+                            <Badge variant="outline" className="text-xs bg-red-100 text-red-800 border-red-300 shrink-0">
                               Replaced
                             </Badge>
                           )}
                           {log.replacedDataDeleted && (
-                            <Badge variant="outline" className="text-xs bg-gray-100 text-gray-600 border-gray-300">
+                            <Badge variant="outline" className="text-xs bg-gray-100 text-gray-600 border-gray-300 shrink-0">
                               Deleted
                             </Badge>
                           )}
-                          <span className="text-muted-foreground">{log.time}</span>
-                          {log.submittedPnl !== undefined && (
-                            <>
-                              <span className="text-muted-foreground">•</span>
-                              <span className={`text-xs font-medium ${getPnlColor(log.submittedPnl)}`}>
-                                Submitted: ${log.submittedPnl.toFixed(2)}
-                              </span>
-                            </>
-                          )}
-                          {log.basePnl !== undefined && (
-                            <>
-                              <span className="text-muted-foreground">•</span>
-                              <span className={`text-xs ${getPnlColor(log.basePnl)}`}>
-                                Base: ${log.basePnl.toFixed(2)}
-                              </span>
-                            </>
-                          )}
-                          {log.pnlDifference !== undefined && (
-                            <>
-                              <span className="text-muted-foreground">•</span>
-                              <Badge 
-                                variant="secondary" 
-                                className={`text-xs font-bold cursor-pointer hover:opacity-80 transition-opacity ${getDifferenceBadgeClass(log.pnlDifference)} ${loadingDialogData.has(log.id) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                onClick={() => !loadingDialogData.has(log.id) && handlePnlDiffClick(log)}
-                                title={loadingDialogData.has(log.id) ? "Loading comparison data..." : "Click to view detailed comparison"}
-                              >
-                                {loadingDialogData.has(log.id) ? "Loading..." : `Diff: ${log.pnlDifference >= 0 ? '+' : '-'}$${Math.abs(log.pnlDifference).toFixed(2)}`}
-                              </Badge>
-                            </>
-                          )}
-                          {log.hadExistingCompare && log.previousComparePnl !== undefined && (
-                            <>
-                              <span className="text-muted-foreground">•</span>
-                              <span className={`text-xs ${getPnlColor(log.previousComparePnl)}`}>
-                                Prev: ${log.previousComparePnl.toFixed(2)}
-                              </span>
-                            </>
-                          )}
-                          {log.previousCompareDifference !== undefined && (
-                            <>
-                              <span className="text-muted-foreground">•</span>
-                              <Badge variant="secondary" className={`text-xs font-bold ${getDifferenceBadgeClass(log.previousCompareDifference)}`}>
-                                vs Prev: {log.previousCompareDifference >= 0 ? '+' : '-'}${Math.abs(log.previousCompareDifference).toFixed(2)}
-                              </Badge>
-                            </>
-                          )}
+                          <span className="text-muted-foreground shrink-0">{log.time}</span>
                           {log.wasReplaced && !log.replacedDataDeleted && (
-                            <div className="flex items-center gap-1 ml-auto">
+                            <div className="flex items-center gap-1 ml-auto shrink-0">
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -769,24 +663,132 @@ export default function ComparePage() {
                             </div>
                           )}
                         </div>
+                        
+                        {/* PnL information row with horizontal scroll on mobile */}
+                        <div className="overflow-x-auto">
+                          <div className="flex items-center gap-2 text-sm min-w-max">
+                            {log.submittedPnl !== undefined && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-muted-foreground">•</span>
+                                <span className={`text-xs font-medium ${getPnlColor(log.submittedPnl)}`}>
+                                  Submitted: ${log.submittedPnl.toFixed(2)}
+                                </span>
+                              </div>
+                            )}
+                            {log.basePnl !== undefined && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-muted-foreground">•</span>
+                                <span className={`text-xs ${getPnlColor(log.basePnl)}`}>
+                                  Base: ${log.basePnl.toFixed(2)}
+                                </span>
+                              </div>
+                            )}
+                            {log.pnlDifference !== undefined && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-muted-foreground">•</span>
+                                <Badge 
+                                  variant="secondary" 
+                                  className={`text-xs font-bold cursor-pointer hover:opacity-80 transition-opacity ${getDifferenceBadgeClass(log.pnlDifference)} ${loadingDialogData.has(log.id) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                  onClick={() => !loadingDialogData.has(log.id) && handlePnlDiffClick(log)}
+                                  title={loadingDialogData.has(log.id) ? "Loading comparison data..." : "Click to view detailed comparison"}
+                                >
+                                  {loadingDialogData.has(log.id) ? "Loading..." : `Diff: ${log.pnlDifference >= 0 ? '+' : '-'}$${Math.abs(log.pnlDifference).toFixed(2)}`}
+                                </Badge>
+                              </div>
+                            )}
+                            {log.hadExistingCompare && log.previousComparePnl !== undefined && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-muted-foreground">•</span>
+                                <span className={`text-xs ${getPnlColor(log.previousComparePnl)}`}>
+                                  Prev: ${log.previousComparePnl.toFixed(2)}
+                                </span>
+                              </div>
+                            )}
+                            {log.previousCompareDifference !== undefined && (
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-muted-foreground">•</span>
+                                <Badge variant="secondary" className={`text-xs font-bold ${getDifferenceBadgeClass(log.previousCompareDifference)}`}>
+                                  vs Prev: {log.previousCompareDifference >= 0 ? '+' : '-'}${Math.abs(log.previousCompareDifference).toFixed(2)}
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                         {log.baseNotes && log.baseNotes.trim() && (
-                          <div className="mt-2 ml-4 p-2 bg-muted/30 rounded-lg border-l-2 border-blue-400">
+                          <div className="mt-2 p-2 bg-muted/30 rounded-lg border-l-2 border-blue-400">
                             <div className="text-xs font-medium text-blue-600 mb-1">Base Data Notes:</div>
-                            <div className="text-xs text-muted-foreground whitespace-pre-wrap">{log.baseNotes}</div>
+                            <div className="text-xs text-muted-foreground whitespace-pre-wrap break-words overflow-wrap-anywhere">{log.baseNotes}</div>
                           </div>
                         )}
                         
                         {/* Replaced Compare Tags */}
                         {log.wasReplaced && (
-                          <div className="mt-2 ml-4 p-2 bg-muted/30 rounded-lg border-l-2 border-orange-400">
+                          <div className="mt-2 p-2 bg-muted/30 rounded-lg border-l-2 border-orange-400">
                             <div className="text-xs font-medium text-orange-600 mb-1">Replaced Compare Tags:</div>
-                            {log.replacedTags && log.replacedTags.length > 0 ? (
-                              renderTagAssignments(log.replacedTags)
-                            ) : (
-                              <div className="text-xs text-muted-foreground italic">
-                                {loadingTags ? 'Loading tags...' : 'No tags assigned'}
-                              </div>
-                            )}
+                            <div className="overflow-x-auto">
+                              {log.replacedTags && log.replacedTags.length > 0 ? (
+                                <div className="flex flex-wrap gap-1 min-w-max">
+                                  {log.replacedTags.map((assignment) => {
+                                    const tagDef = getTagDefinition(assignment.tagId);
+                                    
+                                    if (!tagDef) {
+                                      return null;
+                                    }
+                                    
+                                    return (
+                                      <HoverCard key={assignment.tagId}>
+                                        <HoverCardTrigger asChild>
+                                          <Badge
+                                            variant="outline"
+                                            className="flex items-center gap-1 cursor-help text-xs shrink-0"
+                                            style={{ 
+                                              borderColor: tagDef.color + '40', 
+                                              backgroundColor: tagDef.color + '10' 
+                                            }}
+                                          >
+                                            <Tag className="w-2 h-2" style={{ color: tagDef.color }} />
+                                            <span style={{ color: tagDef.color }}>{tagDef.name}</span>
+                                            {assignment.impact === 'positive' ? (
+                                              <TrendingUp className="w-2 h-2 text-green-500" />
+                                            ) : (
+                                              <TrendingDown className="w-2 h-2 text-red-500" />
+                                            )}
+                                          </Badge>
+                                        </HoverCardTrigger>
+                                        <HoverCardContent className="w-80 p-3">
+                                          <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                              <div 
+                                                className="w-4 h-4 rounded-full" 
+                                                style={{ backgroundColor: tagDef.color }}
+                                              />
+                                              <span className="font-semibold">{tagDef.name}</span>
+                                            </div>
+                                            {tagDef.description && (
+                                              <p className="text-sm text-muted-foreground">{tagDef.description}</p>
+                                            )}
+                                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                              <span>Impact: {assignment.impact}</span>
+                                              <span>Assigned: {new Date(assignment.assignedAt).toLocaleDateString()}</span>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                              <span>Usage: {tagDef.usageCount} times</span>
+                                              {tagDef.lastUsed && (
+                                                <span>Last used: {new Date(tagDef.lastUsed).toLocaleDateString()}</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </HoverCardContent>
+                                      </HoverCard>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-muted-foreground italic">
+                                  {loadingTags ? 'Loading tags...' : 'No tags assigned'}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
                         

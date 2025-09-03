@@ -99,7 +99,6 @@ export default function AdminPage() {
   const [tagDefinitions, setTagDefinitions] = useState<any[]>([]);
   const [loadingTags, setLoadingTags] = useState(false);
   const [selectedTagFilters, setSelectedTagFilters] = useState<Set<string>>(new Set());
-  const [filteredReplacedData, setFilteredReplacedData] = useState<ReplacedCompareData[]>([]);
 
   useEffect(() => {
     fetchFileInfo();
