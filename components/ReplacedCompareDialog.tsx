@@ -1,11 +1,15 @@
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { TradeListEntry } from "@/lib/trading-log-parser";
+import { TradeListEntry, DailyStats } from "@/lib/trading-log-parser";
 import { format, parseISO } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { Loader2, Trash2, CheckCircle2, ChevronDown, ChevronRight, ArrowRight, FileText, Tag, TrendingUp, TrendingDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { compareTradingLogs } from "@/lib/trading-log-comparator";
 import { toast } from "sonner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -22,6 +26,7 @@ interface ReplacedCompareData {
       losses: number;
     };
     tradeList: TradeListEntry[];
+    sessionBreakdown?: DailyStats['sessionBreakdown'];
   };
   metadata?: {
     replacedAt?: string;
@@ -47,6 +52,7 @@ interface CurrentCompareData {
       losses: number;
     };
     tradeList: TradeListEntry[];
+    sessionBreakdown?: DailyStats['sessionBreakdown'];
   };
   metadata?: {
     notes?: string;
@@ -76,6 +82,8 @@ interface TagDefinition {
   usageCount: number;
 }
 
+type SessionKey = keyof DailyStats['sessionBreakdown'];
+
 export function ReplacedCompareDialog({ 
   isOpen, 
   onClose, 
@@ -92,6 +100,10 @@ export function ReplacedCompareDialog({
   const [loadingNotes, setLoadingNotes] = useState(false);
   const [tagDefinitions, setTagDefinitions] = useState<TagDefinition[]>([]);
   const [loadingTags, setLoadingTags] = useState(false);
+  const [expandedFillDetails, setExpandedFillDetails] = useState<Set<string>>(new Set());
+  const [isVerified, setIsVerified] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isMerging, setIsMerging] = useState(false);
 
   // Helper function to generate a unique key for a trade
   const getTradeKey = (trade: TradeListEntry) => {
@@ -287,11 +299,27 @@ export function ReplacedCompareDialog({
     });
   };
 
+  // Toggle fill details expansion state
+  const toggleFillDetailsExpansion = (trade: TradeListEntry, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent triggering the parent click
+    const tradeKey = getTradeKey(trade);
+    setExpandedFillDetails(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(tradeKey)) {
+        newSet.delete(tradeKey);
+      } else {
+        newSet.add(tradeKey);
+      }
+      return newSet;
+    });
+  };
+
   // Clear all markings when dialog opens
   React.useEffect(() => {
     if (isOpen) {
       setMarkedTrades(new Set());
       setCollapsedTrades(new Set());
+      setExpandedFillDetails(new Set());
     }
   }, [isOpen]);
 
@@ -364,6 +392,75 @@ export function ReplacedCompareDialog({
     }
   };
 
+  const saveVerificationStatus = async (verified: boolean) => {
+    try {
+      if (!replacedData?.date) return;
+      
+      setIsSaving(true);
+      const response = await fetch('/api/trading-data/compare/replaced', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          date: replacedData.date,
+          verified,
+          verifiedBy: 'user'
+        }),
+      });
+
+      if (response.ok) {
+        toast.success(verified ? "Day marked as verified" : "Day marked as unverified");
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to update verification status");
+      }
+    } catch (error) {
+      console.error('Error saving verification status:', error);
+      toast.error("Failed to save verification status");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleVerificationChange = async (verified: boolean) => {
+    setIsVerified(verified);
+    await saveVerificationStatus(verified);
+  };
+
+  const handleMerge = async () => {
+    try {
+      setIsMerging(true);
+      const response = await fetch('/api/trading-data/compare/replaced', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'merge',
+          date: replacedData?.date
+        }),
+      });
+
+      if (response.ok) {
+        toast.success("Replaced data successfully merged to current data");
+        // Call the parent's onDataUpdate callback
+        if (onDataUpdate) {
+          onDataUpdate();
+        }
+        onClose();
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to merge data");
+      }
+    } catch (error) {
+      console.error('Error merging data:', error);
+      toast.error("Failed to merge data");
+    } finally {
+      setIsMerging(false);
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -375,6 +472,11 @@ export function ReplacedCompareDialog({
 
   const getPnlColor = (value: number) => {
     return value >= 0 ? 'text-green-500' : 'text-red-500';
+  };
+
+  const formatDifference = (diff: { value: number; percentage: number }) => {
+    const sign = diff.value >= 0 ? '+' : '';
+    return `${sign}${formatCurrency(diff.value)} (${sign}${diff.percentage.toFixed(1)}%)`;
   };
 
   // Enhanced badge color function with muted green/red colors
@@ -720,6 +822,7 @@ export function ReplacedCompareDialog({
                       {subTrade.exitReason}
                     </Badge>
                     <span>{subTrade.quantity} @ {subTrade.exitPrice}</span>
+                    <span className="text-muted-foreground">{formatTime(subTrade.exitTimestamp)}</span>
                   </div>
                   <span className={`${getPnlColor(subTrade.pnl)}`}>{formatCurrency(subTrade.pnl)}</span>
                 </div>
@@ -733,23 +836,109 @@ export function ReplacedCompareDialog({
           </div>
         )}
 
-        {/* Trade Fill Details - Predictive Reversal Only */}
-        <div className="mt-2 pt-2 border-t border-muted-foreground/20">
-          <div className="text-xs text-muted-foreground mb-1">Fill Details:</div>
-          <div className="flex items-center gap-1 text-xs">
-            <span className="text-muted-foreground">Predictive:</span>
-            <Badge 
-              variant="outline" 
-              className={`text-xs ${
-                (trade.isPredictiveReversal ?? false)
-                  ? 'bg-blue-400/20 text-blue-400 border-blue-400/30' 
-                  : 'bg-gray-400/20 text-gray-400 border-gray-400/30'
-              }`}
-            >
-              {(trade.isPredictiveReversal ?? false) ? 'Yes' : 'No'}
-            </Badge>
-          </div>
-        </div>
+        {/* Trade Fill Details */}
+        {(trade.isPredictiveReversal !== undefined || trade.atr !== undefined || trade.barHigh !== undefined || trade.barLow !== undefined || trade.volumeTradeLength !== undefined || trade.fillDistance !== undefined) && (() => {
+          const tradeKey = getTradeKey(trade);
+          const isExpanded = expandedFillDetails.has(tradeKey);
+          const hasAdditionalDetails = trade.atr !== undefined || trade.barHigh !== undefined || trade.barLow !== undefined || trade.volumeTradeLength !== undefined || trade.fillDistance !== undefined;
+          
+          return (
+            <div className="mt-2 pt-2 border-t border-muted-foreground/20">
+              <div className="flex items-center justify-between mb-1">
+                <div className="text-xs text-muted-foreground">Fill Details:</div>
+                {hasAdditionalDetails && (
+                  <button
+                    onClick={(e) => toggleFillDetailsExpansion(trade, e)}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors p-1 rounded hover:bg-muted/40"
+                    title={isExpanded ? "Hide additional details" : "Show additional details"}
+                  >
+                    <span className="text-xs">More</span>
+                    {isExpanded ? (
+                      <ChevronDown className="w-3 h-3" />
+                    ) : (
+                      <ChevronRight className="w-3 h-3" />
+                    )}
+                  </button>
+                )}
+              </div>
+              
+              <div className="space-y-1">
+                {/* Always visible: Predictive Reversal */}
+                {trade.isPredictiveReversal !== undefined && (
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="text-muted-foreground">Predictive:</span>
+                    <Badge 
+                      variant="outline" 
+                      className={`text-xs ${
+                        trade.isPredictiveReversal 
+                          ? 'bg-blue-400/20 text-blue-400 border-blue-400/30'
+                          : 'bg-gray-400/20 text-gray-400 border-gray-400/30'
+                      }`}
+                    >
+                      {trade.isPredictiveReversal ? 'Reversal' : 'Standard'}
+                    </Badge>
+                  </div>
+                )}
+                
+                {/* Collapsible: Additional Details */}
+                {isExpanded && (
+                  <>
+                    {/* ATR */}
+                    {trade.atr !== undefined && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">ATR:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {trade.atr.toFixed(1)}
+                        </Badge>
+                      </div>
+                    )}
+                    
+                    {/* Bar High/Low Information */}
+                    {(trade.barHigh !== undefined || trade.barLow !== undefined) && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">
+                          {trade.barHigh !== undefined ? 'Bar High:' : 'Bar Low:'}
+                        </span>
+                        <Badge variant="outline" className="text-xs">
+                          {trade.barHigh !== undefined ? trade.barHigh : trade.barLow}
+                        </Badge>
+                        {((trade.barHigh !== undefined && trade.barHighDistance !== undefined) || 
+                          (trade.barLow !== undefined && trade.barLowDistance !== undefined)) && (
+                          <>
+                            <span className="text-muted-foreground">Distance:</span>
+                            <Badge variant="outline" className="text-xs">
+                              {trade.barHigh !== undefined ? trade.barHighDistance?.toFixed(2) : trade.barLowDistance?.toFixed(2)}
+                            </Badge>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Volume Trade Length */}
+                    {trade.volumeTradeLength !== undefined && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">Vol Trade Length:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {trade.volumeTradeLength}
+                        </Badge>
+                      </div>
+                    )}
+                    
+                    {/* Fill Distance */}
+                    {trade.fillDistance !== undefined && (
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">Fill Distance:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {trade.fillDistance.toFixed(2)}
+                        </Badge>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {isModified && (filteredChanges.length > 0 || subTradeComparison) && (
           <div className="mt-2 pt-2 border-t">
@@ -817,6 +1006,68 @@ export function ReplacedCompareDialog({
             </div>
           </div>
         )}
+      </div>
+    );
+  };
+
+  const renderSessionComparison = () => {
+    // Check if sessionBreakdown exists
+    if (!replacedData?.analysis?.sessionBreakdown || !currentCompareData?.analysis?.sessionBreakdown) {
+      return (
+        <div className="p-4 text-center text-muted-foreground">
+          No session breakdown data available
+        </div>
+      );
+    }
+    
+    const sessions = (Object.keys(replacedData.analysis.sessionBreakdown) as SessionKey[]).filter(session => session.toLowerCase() !== 'main');
+    return (
+      <div className="space-y-4">
+        {sessions.map(session => {
+          const replacedSession = replacedData.analysis.sessionBreakdown![session];
+          const currentSession = currentCompareData.analysis.sessionBreakdown![session];
+          const pnlDiff = {
+            value: currentSession.pnl - replacedSession.pnl,
+            percentage: (currentSession.pnl - replacedSession.pnl) / (Math.abs(replacedSession.pnl) || 1) * 100,
+          };
+          const isZeroDiff = pnlDiff.value === 0 && (!isFinite(pnlDiff.percentage) || pnlDiff.percentage === 0);
+
+          return (
+            <div key={session} className={`p-4 rounded-lg bg-muted/30${isZeroDiff ? ' opacity-60' : ''}`}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium capitalize">{session}</div>
+                <div className="flex items-center gap-4">
+                  <div>
+                    <div className="text-sm text-muted-foreground">Replaced</div>
+                    <div className="text-muted-foreground">
+                      {formatCurrency(replacedSession.pnl)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {replacedSession.trades} trades
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm text-muted-foreground">Current</div>
+                    <div className="text-muted-foreground">
+                      {formatCurrency(currentSession.pnl)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {currentSession.trades} trades
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-2 pt-2 border-t">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Difference</span>
+                  <Badge className={`font-medium px-2 py-1 ${getBadgeColors(pnlDiff.value)}`}>
+                    {formatDifference(pnlDiff)}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -1035,6 +1286,12 @@ export function ReplacedCompareDialog({
               <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">
                 Replaced vs Current
               </Badge>
+              {isVerified && (
+                <div className="flex items-center gap-1 text-green-600">
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span className="text-sm font-medium">Verified</span>
+                </div>
+              )}
             </div>
             {currentCompareData && (
               <Badge className={`font-bold text-lg px-3 py-1 ${getBadgeColors(currentCompareData.analysis.headline.totalPnl - replacedData.analysis.headline.totalPnl)}`}>
@@ -1087,191 +1344,265 @@ export function ReplacedCompareDialog({
 
         {/* Scrollable content area */}
         <div className="flex-1 overflow-y-auto min-h-0">
-          {/* Tags Section - Only show if tags exist */}
-          {(replacedData.metadata?.tagAssignments && replacedData.metadata.tagAssignments.length > 0) || 
-           (currentCompareData?.metadata?.tagAssignments && currentCompareData.metadata.tagAssignments.length > 0) ? (
-            <div className="space-y-4 mb-6">
-              <div className="text-lg font-semibold flex items-center gap-2">
-                <Tag className="w-5 h-5 text-muted-foreground" />
-                Tags
-              </div>
-              {loadingTags ? (
-                <div className="flex items-center justify-center py-4">
+          <Tabs defaultValue="sessions">
+            <TabsList className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm w-full">
+              <TabsTrigger value="sessions">Sessions</TabsTrigger>
+              <TabsTrigger value="trades">Trades</TabsTrigger>
+              <TabsTrigger value="manage">Manage</TabsTrigger>
+            </TabsList>
+            <TabsContent value="sessions" className="mt-4">
+              {loadingCurrentData ? (
+                <div className="flex items-center justify-center py-8">
                   <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span className="text-sm text-muted-foreground">Loading tags...</span>
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                    <span>Loading current comparison data...</span>
                   </div>
                 </div>
               ) : (
+                renderSessionComparison()
+              )}
+            </TabsContent>
+            <TabsContent value="trades" className="mt-4">
+              {loadingCurrentData ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-6 h-6 animate-spin" />
+                    <span>Loading current comparison data...</span>
+                  </div>
+                </div>
+              ) : (
+                renderTradeComparison()
+              )}
+            </TabsContent>
+            <TabsContent value="manage" className="mt-4">
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Day Verification</Label>
+                    <div className="text-sm text-muted-foreground">
+                      {isVerified ? "This day has been verified and reviewed" : "Mark this day as verified after reviewing the changes"}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
+                    <div className="flex items-center gap-2">
+                      {isVerified && (
+                        <div className="flex items-center gap-1 text-green-600">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span className="text-sm font-medium">Verified</span>
+                        </div>
+                      )}
+                      <Switch
+                        checked={isVerified}
+                        onCheckedChange={handleVerificationChange}
+                        disabled={loadingCurrentData}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Tags Section - Only show if tags exist */}
+                {(replacedData.metadata?.tagAssignments && replacedData.metadata.tagAssignments.length > 0) || 
+                 (currentCompareData?.metadata?.tagAssignments && currentCompareData.metadata.tagAssignments.length > 0) ? (
+                  <div className="space-y-4 mb-6">
+                    <div className="text-lg font-semibold flex items-center gap-2">
+                      <Tag className="w-5 h-5 text-muted-foreground" />
+                      Tags
+                    </div>
+                    {loadingTags ? (
+                      <div className="flex items-center justify-center py-4">
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span className="text-sm text-muted-foreground">Loading tags...</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Replaced Compare Tags */}
+                        {replacedData.metadata?.tagAssignments && replacedData.metadata.tagAssignments.length > 0 && (
+                          <div>
+                            <div className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                              <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300 text-xs">
+                                Replaced
+                              </Badge>
+                              Tags
+                            </div>
+                            <div className="bg-muted/30 rounded-lg p-4 border border-muted-foreground/20">
+                              {renderTagAssignments(replacedData.metadata.tagAssignments)}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Current Compare Tags */}
+                        {currentCompareData?.metadata?.tagAssignments && currentCompareData.metadata.tagAssignments.length > 0 && (
+                          <div>
+                            <div className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                              <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">
+                                Current
+                              </Badge>
+                              Tags
+                            </div>
+                            <div className="bg-muted/30 rounded-lg p-4 border border-muted-foreground/20">
+                              {renderTagAssignments(currentCompareData.metadata.tagAssignments)}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* No tags message */}
+                        {(!replacedData.metadata?.tagAssignments || replacedData.metadata.tagAssignments.length === 0) &&
+                         (!currentCompareData?.metadata?.tagAssignments || currentCompareData.metadata.tagAssignments.length === 0) && (
+                          <div className="text-center py-4 text-muted-foreground">
+                            <p>No tags assigned to this comparison data</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+
+                {/* Tag Management Section */}
+                <div className="space-y-4 mb-6">
+                  <div className="text-lg font-semibold flex items-center gap-2">
+                    <Tag className="w-5 h-5 text-muted-foreground" />
+                    Manage Tags
+                  </div>
+                  <div className="bg-muted/30 rounded-lg p-4 border border-muted-foreground/20">
+                    <TagAssignmentInterface
+                      date={replacedData?.date || ''}
+                      initialTagAssignments={replacedData?.metadata?.tagAssignments || []}
+                      onTagAssignmentsChange={handleTagAssignmentsChange}
+                      disabled={loadingTags}
+                    />
+                  </div>
+                </div>
+
+                {/* Notes Section */}
                 <div className="space-y-4">
-                  {/* Replaced Compare Tags */}
-                  {replacedData.metadata?.tagAssignments && replacedData.metadata.tagAssignments.length > 0 && (
-                    <div>
-                      <div className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                        <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300 text-xs">
-                          Replaced
-                        </Badge>
-                        Tags
-                      </div>
-                      <div className="bg-muted/30 rounded-lg p-4 border border-muted-foreground/20">
-                        {renderTagAssignments(replacedData.metadata.tagAssignments)}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Current Compare Tags */}
-                  {currentCompareData?.metadata?.tagAssignments && currentCompareData.metadata.tagAssignments.length > 0 && (
-                    <div>
-                      <div className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                        <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">
-                          Current
-                        </Badge>
-                        Tags
-                      </div>
-                      <div className="bg-muted/30 rounded-lg p-4 border border-muted-foreground/20">
-                        {renderTagAssignments(currentCompareData.metadata.tagAssignments)}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* No tags message */}
-                  {(!replacedData.metadata?.tagAssignments || replacedData.metadata.tagAssignments.length === 0) &&
-                   (!currentCompareData?.metadata?.tagAssignments || currentCompareData.metadata.tagAssignments.length === 0) && (
-                    <div className="text-center py-4 text-muted-foreground">
-                      <p>No tags assigned to this comparison data</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : null}
-
-          {/* Tag Management Section */}
-          <div className="space-y-4 mb-6">
-            <div className="text-lg font-semibold flex items-center gap-2">
-              <Tag className="w-5 h-5 text-muted-foreground" />
-              Manage Tags
-            </div>
-            <div className="bg-muted/30 rounded-lg p-4 border border-muted-foreground/20">
-              <TagAssignmentInterface
-                date={replacedData?.date || ''}
-                initialTagAssignments={replacedData?.metadata?.tagAssignments || []}
-                onTagAssignmentsChange={handleTagAssignmentsChange}
-                disabled={loadingTags}
-              />
-            </div>
-          </div>
-
-          {/* Notes Section */}
-          <div className="space-y-4">
-          <div className="text-lg font-semibold">Notes</div>
+                  <div className="text-lg font-semibold">Notes</div>
           
-          {/* Loading state for notes */}
-          {loadingNotes && (
-            <div className="flex items-center justify-center py-4">
-              <div className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Loading notes...</span>
-              </div>
-            </div>
-          )}
-
-          {/* Notes content */}
-          {!loadingNotes && (
-            <Accordion type="multiple" className="w-full">
-              {/* Replaced Compare Notes */}
-              {replacedData.metadata?.notes && replacedData.metadata.notes.trim() && (
-                <AccordionItem value="replaced-notes">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-2 w-full">
-                      <FileText className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Replaced Compare Notes</span>
-                      <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300 text-xs">
-                        Replaced
-                      </Badge>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="pt-2 pb-2">
-                      <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 rounded-md p-3 border border-muted-foreground/20">
-                        {replacedData.metadata.notes}
+                  {/* Loading state for notes */}
+                  {loadingNotes && (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Loading notes...</span>
                       </div>
                     </div>
-                  </AccordionContent>
-                </AccordionItem>
-              )}
+                  )}
 
-              {/* Base Notes */}
-              {baseNotes && baseNotes.trim() && (
-                <AccordionItem value="base-notes">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-2 w-full">
-                      <FileText className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-medium text-muted-foreground">Base Day Notes</span>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="pt-2 pb-2">
-                      <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 rounded-md p-3 border border-muted-foreground/20">
-                        {baseNotes}
-                      </div>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              )}
+                  {/* Notes content */}
+                  {!loadingNotes && (
+                    <Accordion type="multiple" className="w-full">
+                      {/* Replaced Compare Notes */}
+                      {replacedData.metadata?.notes && replacedData.metadata.notes.trim() && (
+                        <AccordionItem value="replaced-notes">
+                          <AccordionTrigger className="hover:no-underline">
+                            <div className="flex items-center gap-2 w-full">
+                              <FileText className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-sm font-medium">Replaced Compare Notes</span>
+                              <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300 text-xs">
+                                Replaced
+                              </Badge>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="pt-2 pb-2">
+                              <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 rounded-md p-3 border border-muted-foreground/20">
+                                {replacedData.metadata.notes}
+                              </div>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
 
-              {/* Current Compare Notes */}
-              {currentCompareData?.metadata?.notes && currentCompareData.metadata.notes.trim() && (
-                <AccordionItem value="current-notes">
-                  <AccordionTrigger className="hover:no-underline">
-                    <div className="flex items-center gap-2 w-full">
-                      <FileText className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Current Compare Notes</span>
-                      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">
-                        Current
-                      </Badge>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="pt-2 pb-2">
-                      <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 rounded-md p-3 border border-muted-foreground/20">
-                        {currentCompareData.metadata.notes}
-                      </div>
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              )}
+                      {/* Base Notes */}
+                      {baseNotes && baseNotes.trim() && (
+                        <AccordionItem value="base-notes">
+                          <AccordionTrigger className="hover:no-underline">
+                            <div className="flex items-center gap-2 w-full">
+                              <FileText className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-sm font-medium text-muted-foreground">Base Day Notes</span>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="pt-2 pb-2">
+                              <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 rounded-md p-3 border border-muted-foreground/20">
+                                {baseNotes}
+                              </div>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
 
-              {/* No notes message */}
-              {!loadingNotes && 
-               (!replacedData.metadata?.notes || !replacedData.metadata.notes.trim()) &&
-               (!baseNotes || !baseNotes.trim()) &&
-               (!currentCompareData?.metadata?.notes || !currentCompareData.metadata.notes.trim()) && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <p>No notes available for this comparison</p>
+                      {/* Current Compare Notes */}
+                      {currentCompareData?.metadata?.notes && currentCompareData.metadata.notes.trim() && (
+                        <AccordionItem value="current-notes">
+                          <AccordionTrigger className="hover:no-underline">
+                            <div className="flex items-center gap-2 w-full">
+                              <FileText className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-sm font-medium">Current Compare Notes</span>
+                              <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 text-xs">
+                                Current
+                              </Badge>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent>
+                            <div className="pt-2 pb-2">
+                              <div className="text-sm text-muted-foreground whitespace-pre-wrap bg-muted/30 rounded-md p-3 border border-muted-foreground/20">
+                                {currentCompareData.metadata.notes}
+                              </div>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
+
+                      {/* No notes message */}
+                      {!loadingNotes && 
+                       (!replacedData.metadata?.notes || !replacedData.metadata.notes.trim()) &&
+                       (!baseNotes || !baseNotes.trim()) &&
+                       (!currentCompareData?.metadata?.notes || !currentCompareData.metadata.notes.trim()) && (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <p>No notes available for this comparison</p>
+                        </div>
+                      )}
+                    </Accordion>
+                  )}
                 </div>
-              )}
-            </Accordion>
-          )}
-        </div>
 
-        {/* Loading state */}
-        {loadingCurrentData && (
-          <div className="flex items-center justify-center py-8">
-            <div className="flex items-center gap-2">
-              <Loader2 className="w-6 h-6 animate-spin" />
-              <span>Loading current comparison data...</span>
-            </div>
-          </div>
-        )}
+                <Separator />
 
-          {/* Trade Comparison */}
-          {!loadingCurrentData && (
-            <div className="space-y-4">
-              <div className="text-lg font-semibold">Trade Differences</div>
-              {renderTradeComparison()}
-            </div>
-          )}
+                <div className="flex justify-end gap-2">
+                  <Button
+                    onClick={handleDelete}
+                    variant="destructive"
+                    className="gap-2"
+                    disabled={isDeleting || loadingCurrentData}
+                  >
+                    {isDeleting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                    {isDeleting ? "Deleting..." : "Delete Replaced"}
+                  </Button>
+                  <Button
+                    onClick={handleMerge}
+                    className="gap-2"
+                    disabled={!isVerified || isMerging || loadingCurrentData}
+                  >
+                    {isMerging ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4" />
+                    )}
+                    {isMerging ? "Merging..." : "Merge to Current"}
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </DialogContent>
     </Dialog>

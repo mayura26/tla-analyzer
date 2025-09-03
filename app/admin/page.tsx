@@ -461,6 +461,49 @@ export default function AdminPage() {
     return value >= 0 ? 'text-green-600' : 'text-red-600';
   };
 
+  // Helper function to render tags for a replaced compare item (showing current data tags)
+  const renderTags = (item: ReplacedCompareData) => {
+    const currentData = currentCompareDataMap.get(item.date);
+    const tagAssignments = currentData?.metadata?.tagAssignments || [];
+    if (tagAssignments.length === 0) return null;
+
+    return (
+      <div className="flex flex-wrap gap-1 mt-2">
+        {tagAssignments.map((assignment) => {
+          const tag = tagDefinitions.find(t => t.id === assignment.tagId);
+          if (!tag) return null;
+
+          return (
+            <Badge
+              key={assignment.tagId}
+              variant="secondary"
+              className="text-xs px-2 py-1"
+              style={{
+                backgroundColor: tag.color + '20',
+                borderColor: tag.color + '40',
+                color: tag.color
+              }}
+            >
+              <div className="flex items-center gap-1">
+                <div 
+                  className="w-2 h-2 rounded-full" 
+                  style={{ backgroundColor: tag.color }}
+                />
+                <span>{tag.name}</span>
+                {assignment.impact === 'positive' && (
+                  <span className="text-green-600">+</span>
+                )}
+                {assignment.impact === 'negative' && (
+                  <span className="text-red-600">-</span>
+                )}
+              </div>
+            </Badge>
+          );
+        })}
+      </div>
+    );
+  };
+
   const fetchFileData = async (filename: string) => {
     if (!filename) return;
     
@@ -1742,6 +1785,9 @@ export default function AdminPage() {
                                       Replaced: {new Date(item.metadata.replacedAt).toLocaleString()}
                                     </div>
                                   )}
+                                  
+                                  {/* Tags Display */}
+                                  {renderTags(item)}
                                 </div>
                               );
                             })}
