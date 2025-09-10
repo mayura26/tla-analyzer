@@ -585,9 +585,9 @@ export default function CompareViewPage() {
                       {getImprovementIndicator(stats.compareWinDrawLoss.wins, stats.baseWinDrawLoss.wins)}
                     </div>
 
-                    {/* Updated Data */}
+                    {/* New Version */}
                     <div className="space-y-2">
-                      <div className="text-xs font-medium text-blue-600">Updated Data</div>
+                      <div className="text-xs font-medium text-blue-600">New Version</div>
                       <div className="flex items-center space-x-1">
                         <div className="h-4 bg-green-600 rounded" style={{
                           width: `${((stats.compareWinDrawLoss.wins) / (stats.totalCompareTrades || 1)) * 100}%`
@@ -606,9 +606,9 @@ export default function CompareViewPage() {
                       </div>
                     </div>
 
-                    {/* Original Data */}
+                    {/* Current Version */}
                     <div className="space-y-2">
-                      <div className="text-xs font-medium text-orange-600">Original Data</div>
+                      <div className="text-xs font-medium text-orange-600">Current Version</div>
                       <div className="flex items-center space-x-1">
                         <div className="h-4 bg-green-600 rounded" style={{
                           width: `${((stats.baseWinDrawLoss.wins) / (stats.totalBaseTrades || 1)) * 100}%`
@@ -635,9 +635,9 @@ export default function CompareViewPage() {
                       {getImprovementIndicator(stats.compareGreenRed.greenDays, stats.baseGreenRed.greenDays)}
                     </div>
 
-                    {/* Updated Data */}
+                    {/* New Version */}
                     <div className="space-y-2">
-                      <div className="text-xs font-medium text-blue-600">Updated Data</div>
+                      <div className="text-xs font-medium text-blue-600">New Version</div>
                       <div className="flex items-center space-x-1">
                         <div className="h-4 bg-green-600 rounded" style={{
                           width: `${((stats.compareGreenRed.greenDays) / (stats.compareGreenRed.greenDays + stats.compareGreenRed.redDays || 1)) * 100}%`
@@ -652,9 +652,9 @@ export default function CompareViewPage() {
                       </div>
                     </div>
 
-                    {/* Original Data */}
+                    {/* Current Version */}
                     <div className="space-y-2">
-                      <div className="text-xs font-medium text-orange-600">Original Data</div>
+                      <div className="text-xs font-medium text-orange-600">Current Version</div>
                       <div className="flex items-center space-x-1">
                         <div className="h-4 bg-green-600 rounded" style={{
                           width: `${((stats.baseGreenRed.greenDays) / (stats.baseGreenRed.greenDays + stats.baseGreenRed.redDays || 1)) * 100}%`
@@ -704,13 +704,13 @@ export default function CompareViewPage() {
                               </span>
                             </div>
                             <div className="flex items-center text-xs">
-                              <div className="w-12 text-blue-500">Updated</div>
+                              <div className="w-12 text-blue-500">New</div>
                               <div className="flex-1 bg-muted/50 rounded-sm">
                                 <div className={`${item.className} h-3 rounded-sm`} style={{ width: `${((item.compareCount || 0) / maxCount) * 100}%` }} />
                               </div>
                             </div>
                             <div className="flex items-center text-xs mt-1">
-                              <div className="w-12 text-orange-500">Original</div>
+                              <div className="w-12 text-orange-500">Current</div>
                               <div className="flex-1 bg-muted/50 rounded-sm">
                                 <div className={`${item.className} h-3 rounded-sm`} style={{ width: `${((item.baseCount || 0) / maxCount) * 100}%` }} />
                               </div>
@@ -735,11 +735,11 @@ export default function CompareViewPage() {
                         <span className="font-medium">{stats.totalWeeks}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Updated Trades:</span>
+                        <span className="text-muted-foreground">New Version Trades:</span>
                         <span className="font-medium">{stats.totalCompareTrades}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Original Trades:</span>
+                        <span className="text-muted-foreground">Current Version Trades:</span>
                         <span className="font-medium">{stats.totalBaseTrades}</span>
                       </div>
                     </div>
@@ -855,8 +855,8 @@ export default function CompareViewPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="text-right">
-                              <div className="text-sm text-muted-foreground">Updated: {formatCurrency(day.comparePnl)}</div>
-                              <div className="text-sm text-muted-foreground">Original: {formatCurrency(day.basePnl)}</div>
+                              <div className="text-sm text-muted-foreground">New Version: {formatCurrency(day.comparePnl)}</div>
+                              <div className="text-sm text-muted-foreground">Current Version: {formatCurrency(day.basePnl)}</div>
                             </div>
                             <div className={`flex items-center gap-1 ${getPnlColor(day.pnlDifference)}`}>
                               {getPnlIcon(day.pnlDifference)}

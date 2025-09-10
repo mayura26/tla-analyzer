@@ -625,7 +625,7 @@ export default function ComparePage() {
                           </Badge>
                           {log.hadExistingCompare && (
                             <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300 shrink-0">
-                              Updated
+                              New Version
                             </Badge>
                           )}
                           {log.wasReplaced && (
