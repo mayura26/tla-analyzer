@@ -1,6 +1,7 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { useEffect, useState, Fragment } from "react"
@@ -11,11 +12,15 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion"
-import { ChevronDown, Loader2 } from "lucide-react"
+import { ChevronDown, Loader2, Filter } from "lucide-react"
 import { getPnlColor, getTradeSession, getTradeSubSession } from "@/lib/utils"
 import { PnlTrendChart } from "@/components/PnlTrendChart"
 import { DrawdownChart } from "@/components/DrawdownChart"
 import { parseISO } from "date-fns"
+import { TimeRange } from "@/components/TimeRangeFilter"
+import { filterDailyLogsByTimeRange } from "@/lib/time-range-utils"
+import { TradingStatsProcessor } from "@/lib/trading-stats-processor"
+import { DailyLog } from "@/lib/trading-data-store"
 
 // Add PnL formatter utility
 const formatPnL = (value: number) => {
@@ -40,45 +45,9 @@ interface TradeListEntry {
   losses: number;
 }
 
-interface DailyLog {
-  date: string;
-  analysis: {
-    headline: {
-      totalPnl: number;
-      totalTrades: number;
-      wins: number;
-      losses: number;
-      bigWins?: number;
-      bigLosses?: number;
-      draws?: number;
-      winRate?: string | number;
-      netRate?: string | number;
-      maxWin?: number;
-      maxLoss?: number;
-    };
-    tradeBreakdown?: {
-      fillRate?: number | string;
-    };
-    sessions?: {
-      [session: string]: {
-        pnl: number;
-        trades: number;
-        avgPnlPerTrade: number;
-      };
-    };
-    tradeList?: TradeListEntry[];
-    greenDay?: number | string;
-    redDay?: number | string;
-    plus100?: number | string;
-    mid?: number | string;
-    minus100?: number | string;
-  };
-}
-
 interface DashboardData {
   dailyLogs: DailyLog[];
   stats: TradingStats;
-  last4WeeksStats: TradingStats;
 }
 
 // Add function to group daily logs by day of the week
@@ -153,22 +122,28 @@ const groupLogsBySession = (logs: DailyLog[]) => {
       'end': { pnl: 0, trades: 0, wins: 0, losses: 0, bigWins: 0, bigLosses: 0 }
     };
 
-    log.analysis.tradeList.forEach(trade => {
-      const session = getTradeSession(trade.timestamp);
-      const subSession = getTradeSubSession(trade.timestamp);
-      const sessions = [session, subSession].filter(Boolean) as string[];
+    if (log.analysis.tradeList) {
+      log.analysis.tradeList.forEach(trade => {
+        // Handle both Date objects and string timestamps
+        const timestampStr = trade.timestamp instanceof Date 
+          ? trade.timestamp.toISOString() 
+          : trade.timestamp;
+        const session = getTradeSession(timestampStr);
+        const subSession = getTradeSubSession(timestampStr);
+        const sessions = [session, subSession].filter(Boolean) as string[];
 
-      sessions.forEach(s => {
-        if (dailySessionStats[s]) {
-          dailySessionStats[s].pnl += trade.totalPnl;
-          dailySessionStats[s].trades += 1;
-          if (trade.totalPnl > 0) dailySessionStats[s].wins += 1;
-          if (trade.totalPnl < 0) dailySessionStats[s].losses += 1;
-          if (trade.totalPnl >= BIG_WIN_THRESHOLD) dailySessionStats[s].bigWins += 1;
-          if (trade.totalPnl <= BIG_LOSS_THRESHOLD) dailySessionStats[s].bigLosses += 1;
-        }
+        sessions.forEach(s => {
+          if (dailySessionStats[s]) {
+            dailySessionStats[s].pnl += trade.totalPnl;
+            dailySessionStats[s].trades += 1;
+            if (trade.totalPnl > 0) dailySessionStats[s].wins += 1;
+            if (trade.totalPnl < 0) dailySessionStats[s].losses += 1;
+            if (trade.totalPnl >= BIG_WIN_THRESHOLD) dailySessionStats[s].bigWins += 1;
+            if (trade.totalPnl <= BIG_LOSS_THRESHOLD) dailySessionStats[s].bigLosses += 1;
+          }
+        });
       });
-    });
+    }
 
     for (const session in dailySessionStats) {
       if (dailySessionStats[session].trades > 0) {
@@ -194,7 +169,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [expandedSession, setExpandedSession] = useState<string | null>(null);
-  const [expandedSession4Weeks, setExpandedSession4Weeks] = useState<string | null>(null);
+  const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>('all');
 
   useEffect(() => {
     fetch("/api/dashboard")
@@ -214,13 +189,16 @@ export default function Home() {
     );
   }
 
-  const stats = dashboardData?.stats;
-  const last4WeeksStats = dashboardData?.last4WeeksStats;
-  const dayOfWeekLogs = dashboardData ? groupLogsByDayOfWeek(dashboardData.dailyLogs) : {};
+  // Filter daily logs based on selected time range
+  const filteredDailyLogs = dashboardData ? filterDailyLogsByTimeRange(dashboardData.dailyLogs, selectedTimeRange) : [];
   
-  const sessionLogs = dashboardData ? groupLogsBySession(dashboardData.dailyLogs) : {};
-  const recentLogs = dashboardData ? [...dashboardData.dailyLogs].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 20) : [];
-  const sessionLogs4Weeks = dashboardData ? groupLogsBySession(recentLogs) : {};
+  // Calculate stats for filtered data
+  const stats = filteredDailyLogs.length > 0 ? 
+    TradingStatsProcessor.calculateStats(filteredDailyLogs) : 
+    null;
+  
+  const dayOfWeekLogs = filteredDailyLogs.length > 0 ? groupLogsByDayOfWeek(filteredDailyLogs) : {};
+  const sessionLogs = filteredDailyLogs.length > 0 ? groupLogsBySession(filteredDailyLogs) : {};
 
   const pnlDistribution = stats ? [
     { label: '>$400', count: stats.bigWins, className: 'bg-green-600' },
@@ -233,68 +211,102 @@ export default function Home() {
 
   const maxCount = stats ? Math.max(...pnlDistribution.map(d => d.count), 1) : 1;
 
-  const pnlDistribution4Weeks = last4WeeksStats ? [
-    { label: '>$400', count: last4WeeksStats.bigWins, className: 'bg-green-600' },
-    { label: '$100-$400', count: last4WeeksStats.pnlBreakdown.highProfitDays - last4WeeksStats.bigWins, className: 'bg-green-500' },
-    { label: '$0-$100', count: last4WeeksStats.pnlBreakdown.lowProfitDays, className: 'bg-green-400' },
-    { label: '-$100-$0', count: last4WeeksStats.pnlBreakdown.lowLossDays, className: 'bg-red-400' },
-    { label: '-$400 - -$100', count: last4WeeksStats.pnlBreakdown.highLossDays - last4WeeksStats.bigLosses, className: 'bg-red-500' },
-    { label: '<-$400', count: last4WeeksStats.bigLosses, className: 'bg-red-600' },
-  ] : [];
-
-  const maxCount4Weeks = last4WeeksStats ? Math.max(...pnlDistribution4Weeks.map(d => d.count), 1) : 1;
-
   return (
-    <main className="flex min-h-screen flex-col p-3 space-y-3">
-      {/* Top Stats Row */}
-      <div className="grid grid-cols-4 lg:grid-cols-8 gap-2">
-        {[
-          { title: 'Total Days', value: stats?.totalDays || 0 },
-          { title: 'Total PnL', value: formatPnL(stats?.totalPnl || 0), pnl: stats?.totalPnl || 0 },
-          { title: 'Win Rate', value: formatPercent(stats?.winRate || 0) },
-          { title: 'Net Win Rate', value: formatPercent(stats?.netWinRate || 0) },
-          { title: 'Avg Trades', value: formatNumber(stats?.averageTrades || 0) },
-          { title: 'Fill Rate', value: formatPercent(stats?.averageFillRate || 0) },
-          { title: 'Avg PnL', value: formatPnL(stats?.averagePnl || 0), pnl: stats?.averagePnl || 0 },
-          { title: 'Total Trades', value: stats?.totalTrades || 0 }
-        ].map((stat, i) => (
-          <Card key={i} className="bg-card/50">
-            <CardHeader className="p-2 pb-0">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-            </CardHeader>
-            <CardContent className="p-2 pt-1">
-              <div className={`text-xl font-bold ${stat.pnl !== undefined ? getPnlColor(stat.pnl) : ''}`}>{stat.value}</div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+    <main className="flex min-h-screen flex-col p-1 space-y-1">
+      {/* Combined Filter and Stats Panel */}
+      <Card className="bg-card/50">
+        <CardContent className="p-3">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+            {/* Time Range Filter */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">Filter:</span>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                <Button
+                  variant={selectedTimeRange === 'all' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedTimeRange('all')}
+                  className="text-xs h-7 px-3"
+                >
+                  All
+                </Button>
+                {['wtd', 'mtd', 'qtd', 'ytd', 'last-month', 'last-12-weeks', 'last-24-weeks'].map((range) => (
+                  <Button
+                    key={range}
+                    variant={selectedTimeRange === range ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedTimeRange(range as TimeRange)}
+                    className="text-xs h-7 px-3"
+                  >
+                    {range === 'wtd' ? 'WTD' : 
+                     range === 'mtd' ? 'MTD' : 
+                     range === 'qtd' ? 'QTD' : 
+                     range === 'ytd' ? 'YTD' : 
+                     range === 'last-month' ? 'Last Month' : 
+                     range === 'last-12-weeks' ? '12W' : '24W'}
+                  </Button>
+                ))}
+              </div>
+              <Badge variant="secondary" className="text-xs px-2 py-1">
+                {filteredDailyLogs.length} of {dashboardData?.dailyLogs.length || 0} days
+              </Badge>
+            </div>
+
+            {/* Separator */}
+            <div className="hidden lg:block w-px h-8 bg-border"></div>
+
+            {/* Stats Grid */}
+            <div className="flex-1">
+              <div className="grid grid-cols-4 lg:grid-cols-8 gap-4">
+                {[
+                  { title: 'Days', value: stats?.totalDays || 0 },
+                  { title: 'Total PnL', value: formatPnL(stats?.totalPnl || 0), pnl: stats?.totalPnl || 0 },
+                  { title: 'Win Rate', value: formatPercent(stats?.winRate || 0) },
+                  { title: 'Net Rate', value: formatPercent(stats?.netWinRate || 0) },
+                  { title: 'Avg Trades', value: formatNumber(stats?.averageTrades || 0) },
+                  { title: 'Fill Rate', value: formatPercent(stats?.averageFillRate || 0) },
+                  { title: 'Avg PnL', value: formatPnL(stats?.averagePnl || 0), pnl: stats?.averagePnl || 0 },
+                  { title: 'Trades', value: stats?.totalTrades || 0 }
+                ].map((stat, i) => (
+                  <div key={i} className="bg-muted/30 rounded-md p-2 text-center border border-border/50">
+                    <div className="text-xs text-muted-foreground mb-1 font-medium">{stat.title}</div>
+                    <div className={`text-sm font-bold ${stat.pnl !== undefined ? getPnlColor(stat.pnl) : ''}`}>{stat.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* PnL Trend Chart */}
-      <PnlTrendChart dailyLogs={dashboardData?.dailyLogs || []} />
+      <PnlTrendChart dailyLogs={filteredDailyLogs} />
 
       {/* Drawdown Chart */}
-      <DrawdownChart dailyLogs={dashboardData?.dailyLogs || []} />
+      <DrawdownChart dailyLogs={filteredDailyLogs} />
 
       {/* Trading Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1">
         {/* Win/Draw/Loss */}
         <Card className="bg-card/50">
-          <CardHeader className="p-2 pb-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Win/Draw/Loss</CardTitle>
+          <CardHeader className="p-1 pb-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Win/Draw/Loss</CardTitle>
           </CardHeader>
-          <CardContent className="p-2">
-            <div className="flex items-center space-x-1">
-              <div className="h-6 bg-green-600 rounded" style={{ 
+          <CardContent className="p-1">
+            <div className="flex items-center space-x-0.5">
+              <div className="h-3 bg-green-600 rounded" style={{ 
                 width: `${((stats?.winDrawLossBreakdown.wins || 0) / (stats?.totalTrades || 1)) * 100}%` 
               }}/>
-              <div className="h-6 bg-gray-400 rounded" style={{ 
+              <div className="h-3 bg-gray-400 rounded" style={{ 
                 width: `${((stats?.winDrawLossBreakdown.draws || 0) / (stats?.totalTrades || 1)) * 100}%` 
               }}/>
-              <div className="h-6 bg-red-600 rounded" style={{ 
+              <div className="h-3 bg-red-600 rounded" style={{ 
                 width: `${((stats?.winDrawLossBreakdown.losses || 0) / (stats?.totalTrades || 1)) * 100}%` 
               }}/>
             </div>
-            <div className="flex justify-between mt-1 text-sm">
+            <div className="flex justify-between mt-0.5 text-xs">
               <span className="text-green-600">{stats?.winDrawLossBreakdown.wins || 0}</span>
               <span className="text-gray-400">{stats?.winDrawLossBreakdown.draws || 0}</span>
               <span className="text-red-600">{stats?.winDrawLossBreakdown.losses || 0}</span>
@@ -304,19 +316,19 @@ export default function Home() {
 
         {/* Green vs Red */}
         <Card className="bg-card/50">
-          <CardHeader className="p-2 pb-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Green vs Red</CardTitle>
+          <CardHeader className="p-1 pb-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Green vs Red</CardTitle>
           </CardHeader>
-          <CardContent className="p-2">
-            <div className="flex items-center space-x-1">
-              <div className="h-6 bg-green-600 rounded" style={{ 
+          <CardContent className="p-1">
+            <div className="flex items-center space-x-0.5">
+              <div className="h-3 bg-green-600 rounded" style={{ 
                 width: `${((stats?.greenDays || 0) / (stats?.totalDays || 1)) * 100}%` 
               }}/>
-              <div className="h-6 bg-red-600 rounded" style={{ 
+              <div className="h-3 bg-red-600 rounded" style={{ 
                 width: `${((stats?.redDays || 0) / (stats?.totalDays || 1)) * 100}%` 
               }}/>
             </div>
-            <div className="flex justify-between mt-1 text-sm">
+            <div className="flex justify-between mt-0.5 text-xs">
               <span className="text-green-600">{stats?.greenDays || 0} profitable</span>
               <span className="text-red-600">{stats?.redDays || 0} non-profitable</span>
             </div>
@@ -325,17 +337,17 @@ export default function Home() {
 
         {/* PnL Distribution */}
         <Card className="bg-card/50 md:col-span-2">
-          <CardHeader className="p-2 pb-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Daily PnL Distribution</CardTitle>
+          <CardHeader className="p-1 pb-0">
+            <CardTitle className="text-xs font-medium text-muted-foreground">Daily PnL Distribution</CardTitle>
           </CardHeader>
-          <CardContent className="p-2">
-            <div className="space-y-1">
+          <CardContent className="p-1">
+            <div className="space-y-0">
               {pnlDistribution.map((item, index) => (
                 <div key={index} className="flex items-center text-xs">
-                  <div className="w-24 text-muted-foreground">{item.label}</div>
-                  <div className="w-8 text-right font-bold">{item.count}</div>
-                  <div className="flex-1 ml-2">
-                    <div className={`${item.className} h-4 rounded-sm`} style={{ width: `${(item.count / maxCount) * 100}%` }}></div>
+                  <div className="w-16 text-muted-foreground">{item.label}</div>
+                  <div className="w-5 text-right font-bold">{item.count}</div>
+                  <div className="flex-1 ml-1">
+                    <div className={`${item.className} h-2 rounded-sm`} style={{ width: `${(item.count / maxCount) * 100}%` }}></div>
                   </div>
                 </div>
               ))}
@@ -344,30 +356,30 @@ export default function Home() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-1">
         {/* Day of Week Stats */}
         <Card className="bg-card/50">
-          <CardHeader className="p-2">
+          <CardHeader className="px-2 py-0.5">
             <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="day-of-week" className="border-none">
-                <AccordionTrigger className="hover:no-underline py-0">
-                  <CardTitle className="text-base">Day of Week Performance</CardTitle>
+                <AccordionTrigger className="hover:no-underline py-0.5 px-2 h-6">
+                  <CardTitle className="text-xs">Day of Week Performance</CardTitle>
                 </AccordionTrigger>
-                <AccordionContent>
+                <AccordionContent className="p-1">
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow className="hover:bg-transparent">
-                          <TableHead>Day</TableHead>
-                          <TableHead>Days</TableHead>
-                          <TableHead>Trades</TableHead>
-                          <TableHead>Avg</TableHead>
-                          <TableHead>Total PnL</TableHead>
-                          <TableHead>Avg PnL</TableHead>
-                          <TableHead>Win%</TableHead>
-                          <TableHead>Net%</TableHead>
-                          <TableHead>G/R</TableHead>
-                          <TableHead>BW/BL</TableHead>
+                          <TableHead className="text-xs">Day</TableHead>
+                          <TableHead className="text-xs">Days</TableHead>
+                          <TableHead className="text-xs">Trades</TableHead>
+                          <TableHead className="text-xs">Avg</TableHead>
+                          <TableHead className="text-xs">Total PnL</TableHead>
+                          <TableHead className="text-xs">Avg PnL</TableHead>
+                          <TableHead className="text-xs">Win%</TableHead>
+                          <TableHead className="text-xs">Net%</TableHead>
+                          <TableHead className="text-xs">G/R</TableHead>
+                          <TableHead className="text-xs">BW/BL</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -381,32 +393,32 @@ export default function Home() {
                           return (
                             <Fragment key={day}>
                               <TableRow 
-                                className="hover:bg-muted/50 text-sm cursor-pointer"
+                                className="hover:bg-muted/50 text-xs cursor-pointer"
                                 onClick={() => setExpandedDay(isExpanded ? null : day)}
                               >
-                                <TableCell className="py-1 font-medium">
+                                <TableCell className="py-0 font-medium">
                                   <div className="flex items-center">
                                     {day.slice(0,3)}
-                                    <ChevronDown className={`ml-2 h-4 w-4 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                                    <ChevronDown className={`ml-1 h-3 w-3 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                                   </div>
                                 </TableCell>
-                                <TableCell className="py-1">{dayStats.totalDays}</TableCell>
-                                <TableCell className="py-1">{dayStats.totalTrades}</TableCell>
-                                <TableCell className="py-1">{formatNumber(dayStats.averageTrades)}</TableCell>
-                                <TableCell className={`py-1 ${getPnlColor(dayStats.totalPnl)}`}>
+                                <TableCell className="py-0">{dayStats.totalDays}</TableCell>
+                                <TableCell className="py-0">{dayStats.totalTrades}</TableCell>
+                                <TableCell className="py-0">{formatNumber(dayStats.averageTrades)}</TableCell>
+                                <TableCell className={`py-0 ${getPnlColor(dayStats.totalPnl)}`}>
                                   {formatPnL(dayStats.totalPnl)}
                                 </TableCell>
-                                <TableCell className={`py-1 ${getPnlColor(dayStats.averagePnl)}`}>
+                                <TableCell className={`py-0 ${getPnlColor(dayStats.averagePnl)}`}>
                                   {formatPnL(dayStats.averagePnl)}
                                 </TableCell>
-                                <TableCell className="py-1">{formatPercent(dayStats.winRate)}</TableCell>
-                                <TableCell className="py-1">{formatPercent(dayStats.netWinRate)}</TableCell>
-                                <TableCell className="py-1">
+                                <TableCell className="py-0">{formatPercent(dayStats.winRate)}</TableCell>
+                                <TableCell className="py-0">{formatPercent(dayStats.netWinRate)}</TableCell>
+                                <TableCell className="py-0">
                                   <span className="text-green-600">{dayStats.greenDays}</span>
                                   <span className="text-gray-400">/</span>
                                   <span className="text-red-600">{dayStats.redDays}</span>
                                 </TableCell>
-                                <TableCell className="py-1">
+                                <TableCell className="py-0">
                                   <span className="text-green-600">{dayStats.bigWins}</span>
                                   <span className="text-gray-400">/</span>
                                   <span className="text-red-600">{dayStats.bigLosses}</span>
@@ -415,7 +427,7 @@ export default function Home() {
                               {isExpanded && (
                                 <TableRow className="bg-transparent hover:bg-transparent">
                                   <TableCell colSpan={10} className="p-0">
-                                    <div className="p-4">
+                                    <div className="p-2">
                                       {dayLogs.length > 0 ? (
                                         <div className="space-y-2">
                                           <div className="text-xs text-muted-foreground font-medium mb-1">Last 10 {day}s:</div>
@@ -464,25 +476,25 @@ export default function Home() {
 
         {/* Session Stats */}
         <Card className="bg-card/50">
-          <CardHeader className="p-2">
+          <CardHeader className="px-2 py-0.5">
             <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="session-stats" className="border-none">
-                <AccordionTrigger className="hover:no-underline py-0">
-                  <CardTitle className="text-base">Session Performance</CardTitle>
+                <AccordionTrigger className="hover:no-underline py-0.5 px-2 h-6">
+                  <CardTitle className="text-xs">Session Performance</CardTitle>
                 </AccordionTrigger>
-                <AccordionContent>
+                <AccordionContent className="p-1">
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow className="hover:bg-transparent">
-                          <TableHead>Session</TableHead>
-                          <TableHead>Days</TableHead>
-                          <TableHead>Trades</TableHead>
-                          <TableHead>Avg</TableHead>
-                          <TableHead>Total PnL</TableHead>
-                          <TableHead>Avg PnL</TableHead>
-                          <TableHead>Win%</TableHead>
-                          <TableHead>G/R</TableHead>
+                          <TableHead className="text-xs">Session</TableHead>
+                          <TableHead className="text-xs">Days</TableHead>
+                          <TableHead className="text-xs">Trades</TableHead>
+                          <TableHead className="text-xs">Avg</TableHead>
+                          <TableHead className="text-xs">Total PnL</TableHead>
+                          <TableHead className="text-xs">Avg PnL</TableHead>
+                          <TableHead className="text-xs">Win%</TableHead>
+                          <TableHead className="text-xs">G/R</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -497,27 +509,27 @@ export default function Home() {
                           return (
                             <Fragment key={session}>
                               <TableRow 
-                                className="hover:bg-muted/50 text-sm cursor-pointer"
+                                className="hover:bg-muted/50 text-xs cursor-pointer"
                                 onClick={() => setExpandedSession(isExpanded ? null : session)}
                               >
-                                <TableCell className={`py-1 font-medium capitalize ${isSubSession ? 'pl-6' : ''}`}>
+                                <TableCell className={`py-0 font-medium capitalize ${isSubSession ? 'pl-3' : ''}`}>
                                   <div className="flex items-center">
-                                    {isSubSession && <span className="mr-2">↳</span>}
+                                    {isSubSession && <span className="mr-1">↳</span>}
                                     {session}
-                                    <ChevronDown className={`ml-2 h-4 w-4 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                                    <ChevronDown className={`ml-1 h-3 w-3 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                                   </div>
                                 </TableCell>
-                                <TableCell className="py-1">{sessionStats.totalDays}</TableCell>
-                                <TableCell className="py-1">{sessionStats.totalTrades}</TableCell>
-                                <TableCell className="py-1">{formatNumber(sessionStats.averageTrades)}</TableCell>
-                                <TableCell className={`py-1 ${getPnlColor(sessionStats.totalPnl)}`}>
+                                <TableCell className="py-0">{sessionStats.totalDays}</TableCell>
+                                <TableCell className="py-0">{sessionStats.totalTrades}</TableCell>
+                                <TableCell className="py-0">{formatNumber(sessionStats.averageTrades)}</TableCell>
+                                <TableCell className={`py-0 ${getPnlColor(sessionStats.totalPnl)}`}>
                                   {formatPnL(sessionStats.totalPnl)}
                                 </TableCell>
-                                <TableCell className={`py-1 ${getPnlColor(sessionStats.averagePnl)}`}>
+                                <TableCell className={`py-0 ${getPnlColor(sessionStats.averagePnl)}`}>
                                   {formatPnL(sessionStats.averagePnl)}
                                 </TableCell>
-                                <TableCell className="py-1">{formatPercent(sessionStats.winRate)}</TableCell>
-                                <TableCell className="py-1">
+                                <TableCell className="py-0">{formatPercent(sessionStats.winRate)}</TableCell>
+                                <TableCell className="py-0">
                                   <span className="text-green-600">{sessionStats.greenDays}</span>
                                   <span className="text-gray-400">/</span>
                                   <span className="text-red-600">{sessionStats.redDays}</span>
@@ -526,7 +538,7 @@ export default function Home() {
                               {isExpanded && (
                                 <TableRow className="bg-transparent hover:bg-transparent">
                                   <TableCell colSpan={8} className="p-0">
-                                    <div className="p-4">
+                                    <div className="p-2">
                                       {recentSessionLogs.length > 0 ? (
                                         <div className="space-y-2">
                                           <div className="text-xs text-muted-foreground font-medium mb-1">Last 10 {session} sessions:</div>
@@ -570,209 +582,6 @@ export default function Home() {
         </Card>
       </div>
 
-      {/* Last 4 Weeks Stats */}
-      <Card className="bg-card/50">
-        <CardHeader className="p-2">
-          <Accordion type="single" collapsible className="w-full">
-            <AccordionItem value="last-4-weeks" className="border-none">
-              <AccordionTrigger className="hover:no-underline py-0">
-                <CardTitle className="text-base">Last 4 Weeks Performance</CardTitle>
-              </AccordionTrigger>
-              <AccordionContent>
-                <div className="grid grid-cols-4 lg:grid-cols-8 gap-2">
-                  {[
-                    { title: 'Total Days', value: dashboardData?.last4WeeksStats?.totalDays || 0 },
-                    { title: 'Total PnL', value: formatPnL(dashboardData?.last4WeeksStats?.totalPnl || 0), pnl: dashboardData?.last4WeeksStats?.totalPnl || 0 },
-                    { title: 'Win Rate', value: formatPercent(dashboardData?.last4WeeksStats?.winRate || 0) },
-                    { title: 'Net Win Rate', value: formatPercent(dashboardData?.last4WeeksStats?.netWinRate || 0) },
-                    { title: 'Avg Trades', value: formatNumber(dashboardData?.last4WeeksStats?.averageTrades || 0) },
-                    { title: 'Fill Rate', value: formatPercent(dashboardData?.last4WeeksStats?.averageFillRate || 0) },
-                    { title: 'Avg PnL', value: formatPnL(dashboardData?.last4WeeksStats?.averagePnl || 0), pnl: dashboardData?.last4WeeksStats?.averagePnl || 0 },
-                    { title: 'Total Trades', value: dashboardData?.last4WeeksStats?.totalTrades || 0 }
-                  ].map((stat, i) => (
-                    <Card key={i} className="bg-background">
-                      <CardHeader className="p-2 pb-0">
-                        <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-2 pt-1">
-                        <div className={`text-xl font-bold ${stat.pnl !== undefined ? getPnlColor(stat.pnl) : ''}`}>{stat.value}</div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 mt-2">
-                  {/* Win/Draw/Loss */}
-                  <Card className="bg-background">
-                    <CardHeader className="p-2 pb-0">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">Win/Draw/Loss</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-2">
-                      <div className="flex items-center space-x-1">
-                        <div className="h-6 bg-green-600 rounded" style={{
-                          width: `${((last4WeeksStats?.winDrawLossBreakdown.wins || 0) / (last4WeeksStats?.totalTrades || 1)) * 100}%`
-                        }}/>
-                        <div className="h-6 bg-gray-400 rounded" style={{
-                          width: `${((last4WeeksStats?.winDrawLossBreakdown.draws || 0) / (last4WeeksStats?.totalTrades || 1)) * 100}%`
-                        }}/>
-                        <div className="h-6 bg-red-600 rounded" style={{
-                          width: `${((last4WeeksStats?.winDrawLossBreakdown.losses || 0) / (last4WeeksStats?.totalTrades || 1)) * 100}%`
-                        }}/>
-                      </div>
-                      <div className="flex justify-between mt-1 text-sm">
-                        <span className="text-green-600">{last4WeeksStats?.winDrawLossBreakdown.wins || 0}</span>
-                        <span className="text-gray-400">{last4WeeksStats?.winDrawLossBreakdown.draws || 0}</span>
-                        <span className="text-red-600">{last4WeeksStats?.winDrawLossBreakdown.losses || 0}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Green vs Red */}
-                  <Card className="bg-background">
-                    <CardHeader className="p-2 pb-0">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">Green vs Red</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-2">
-                      <div className="flex items-center space-x-1">
-                        <div className="h-6 bg-green-600 rounded" style={{
-                          width: `${((last4WeeksStats?.greenDays || 0) / (last4WeeksStats?.totalDays || 1)) * 100}%`
-                        }}/>
-                        <div className="h-6 bg-red-600 rounded" style={{
-                          width: `${((last4WeeksStats?.redDays || 0) / (last4WeeksStats?.totalDays || 1)) * 100}%`
-                        }}/>
-                      </div>
-                      <div className="flex justify-between mt-1 text-sm">
-                        <span className="text-green-600">{last4WeeksStats?.greenDays || 0} profitable</span>
-                        <span className="text-red-600">{last4WeeksStats?.redDays || 0} non-profitable</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* PnL Distribution */}
-                  <Card className="bg-background md:col-span-2">
-                    <CardHeader className="p-2 pb-0">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">Daily PnL Distribution</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-2">
-                      <div className="space-y-1">
-                        {pnlDistribution4Weeks.map((item, index) => (
-                          <div key={index} className="flex items-center text-xs">
-                            <div className="w-24 text-muted-foreground">{item.label}</div>
-                            <div className="w-8 text-right font-bold">{item.count}</div>
-                            <div className="flex-1 ml-2">
-                              <div className={`${item.className} h-4 rounded-sm`} style={{ width: `${(item.count / maxCount4Weeks) * 100}%` }}></div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-                <div className="mt-2">
-                  <Card className="bg-background">
-                    <CardHeader className="p-2">
-                      <CardTitle className="text-base">Session Performance</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-2">
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="hover:bg-transparent">
-                              <TableHead>Session</TableHead>
-                              <TableHead>Days</TableHead>
-                              <TableHead>Trades</TableHead>
-                              <TableHead>Avg</TableHead>
-                              <TableHead>Total PnL</TableHead>
-                              <TableHead>Avg PnL</TableHead>
-                              <TableHead>Win%</TableHead>
-                              <TableHead>G/R</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {['morning', 'main', 'midday', 'afternoon', 'end'].map(session => {
-                              const sessionStats = last4WeeksStats?.sessionStats[session as keyof typeof last4WeeksStats.sessionStats];
-                              if (!sessionStats || sessionStats.totalDays === 0) return null;
-                              
-                              const isSubSession = session === 'midday' || session === 'afternoon';
-                              const isExpanded = expandedSession4Weeks === session;
-                              const recentSessionLogs = sessionLogs4Weeks[session as keyof typeof sessionLogs4Weeks] || [];
-
-                              return (
-                                <Fragment key={session}>
-                                  <TableRow 
-                                    className="hover:bg-muted/50 text-sm cursor-pointer"
-                                    onClick={() => setExpandedSession4Weeks(isExpanded ? null : session)}
-                                  >
-                                    <TableCell className={`py-1 font-medium capitalize ${isSubSession ? 'pl-6' : ''}`}>
-                                      <div className="flex items-center">
-                                        {isSubSession && <span className="mr-2">↳</span>}
-                                        {session}
-                                        <ChevronDown className={`ml-2 h-4 w-4 shrink-0 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
-                                      </div>
-                                    </TableCell>
-                                    <TableCell className="py-1">{sessionStats.totalDays}</TableCell>
-                                    <TableCell className="py-1">{sessionStats.totalTrades}</TableCell>
-                                    <TableCell className="py-1">{formatNumber(sessionStats.averageTrades)}</TableCell>
-                                    <TableCell className={`py-1 ${getPnlColor(sessionStats.totalPnl)}`}>
-                                      {formatPnL(sessionStats.totalPnl)}
-                                    </TableCell>
-                                    <TableCell className={`py-1 ${getPnlColor(sessionStats.averagePnl)}`}>
-                                      {formatPnL(sessionStats.averagePnl)}
-                                    </TableCell>
-                                    <TableCell className="py-1">{formatPercent(sessionStats.winRate)}</TableCell>
-                                    <TableCell className="py-1">
-                                      <span className="text-green-600">{sessionStats.greenDays}</span>
-                                      <span className="text-gray-400">/</span>
-                                      <span className="text-red-600">{sessionStats.redDays}</span>
-                                    </TableCell>
-                                  </TableRow>
-                                  {isExpanded && (
-                                    <TableRow className="bg-transparent hover:bg-transparent">
-                                      <TableCell colSpan={8} className="p-0">
-                                        <div className="p-4">
-                                          {recentSessionLogs.length > 0 ? (
-                                            <div className="space-y-2">
-                                              <div className="text-xs text-muted-foreground font-medium mb-1">Last 10 {session} sessions:</div>
-                                              <div className="space-y-2">
-                                                {recentSessionLogs.map((log) => (
-                                                  <div key={log.date} className="flex items-center justify-between text-xs bg-muted/50 p-2 rounded-md">
-                                                    <div className="flex-1">
-                                                      <div className="font-semibold text-foreground">{log.date}</div>
-                                                      <div className="text-muted-foreground">
-                                                        {log.trades} trades &bull; {log.wins}W/{log.losses}L/{log.draws}D
-                                                      </div>
-                                                    </div>
-                                                    <div className="flex items-center space-x-2">
-                                                      {log.bigWins > 0 && <Badge className="text-xs border-transparent bg-green-500/20 text-green-700 hover:bg-green-500/30">{log.bigWins} BW</Badge>}
-                                                      {log.bigLosses > 0 && <Badge className="text-xs" variant="destructive">{log.bigLosses} BL</Badge>}
-                                                      <div className={`text-sm font-bold w-20 text-right ${getPnlColor(log.pnl)}`}>
-                                                        {formatPnL(log.pnl)}
-                                                      </div>
-                                                    </div>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          ) : (
-                                            <div className="text-xs text-muted-foreground text-center py-4">No recent data available for {session} sessions.</div>
-                                          )}
-                                        </div>
-                                      </TableCell>
-                                    </TableRow>
-                                  )}
-                                </Fragment>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
-        </CardHeader>
-      </Card>
     </main>
   )
 }

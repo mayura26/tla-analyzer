@@ -75,25 +75,22 @@ export function DrawdownChart({ dailyLogs }: DrawdownChartProps) {
 
   return (
     <Card className="bg-card/50">
-      <CardHeader className="p-4 pb-2">
+      <CardHeader className="px-2 py-0.5">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-base">Drawdown Analysis</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Portfolio decline from peak performance
-            </p>
+            <CardTitle className="text-sm">Drawdown Analysis</CardTitle>
           </div>
           {hasData && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setIsExpanded(!isExpanded)}
-              className="h-8 w-8 p-0"
+              className="h-6 w-6 p-0"
             >
               {isExpanded ? (
-                <ChevronUp className="h-4 w-4" />
+                <ChevronUp className="h-3 w-3" />
               ) : (
-                <ChevronDown className="h-4 w-4" />
+                <ChevronDown className="h-3 w-3" />
               )}
             </Button>
           )}

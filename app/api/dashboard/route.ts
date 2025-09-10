@@ -6,12 +6,10 @@ export async function GET() {
   try {
     const allDays = await tradingDataStore.getAllDays();
     const stats = TradingStatsProcessor.calculateStats(allDays);
-    const last4WeeksStats = TradingStatsProcessor.calculateStatsForLastNDays(allDays, 20);
     
     return NextResponse.json({
       dailyLogs: allDays,
-      stats: stats,
-      last4WeeksStats: last4WeeksStats
+      stats: stats
     });
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
