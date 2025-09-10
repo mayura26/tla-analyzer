@@ -5,10 +5,27 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { Clipboard } from "lucide-react";
 
 export default function InputPage() {
   const [logData, setLogData] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Function to paste data from clipboard
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text.trim()) {
+        setLogData(text);
+        toast.success("Data pasted from clipboard");
+      } else {
+        toast.error("Clipboard is empty");
+      }
+    } catch (error) {
+      console.error('Error reading clipboard:', error);
+      toast.error("Failed to read clipboard. Please paste manually.");
+    }
+  };
 
   const handleSubmit = async () => {
     setIsSubmitting(true);
@@ -42,8 +59,18 @@ export default function InputPage() {
   return (
     <div className="container mx-auto p-4">
       <Card>
-        <CardHeader>
+        <CardHeader className="relative">
           <CardTitle>Trading Log Input</CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePaste}
+            className="absolute top-0 right-6"
+            title="Paste from clipboard"
+          >
+            <Clipboard className="h-4 w-4 mr-2" />
+            Paste
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
