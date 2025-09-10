@@ -1160,7 +1160,7 @@ export function ReplacedCompareDialog({
             return (
           <div>
                 <div className="text-sm font-medium mb-2">
-                  Modified Trades with PnL Changes ({modifiedTradesWithPnlDiff.length})
+                  Modified Trades ({modifiedTradesWithPnlDiff.length})
                 </div>
             <div className="space-y-2">
                   {modifiedTradesWithPnlDiff
@@ -1192,7 +1192,7 @@ export function ReplacedCompareDialog({
             return (
               <div>
                 <div className="text-sm font-medium mb-2 text-muted-foreground">
-                  Modified Trades without PnL Changes ({modifiedTradesWithoutPnlDiff})
+                  Modified Trades (Same PnL) ({modifiedTradesWithoutPnlDiff})
                   <span className="ml-2 text-xs text-muted-foreground">
                     (Hidden - only showing trades with PnL differences)
                   </span>

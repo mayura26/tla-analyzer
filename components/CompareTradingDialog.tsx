@@ -963,11 +963,17 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
       { trades: compareTrades, dailyStats: compareStats }
     );
 
-    // Compute the set of trade keys that actually require review (added, removed, modified)
+    // Filter modified trades to only include those with PnL differences
+    const modifiedTradesWithPnlDiff = comparison.differences.trades.modified.filter(({ changes }) => {
+      const pnlChange = changes.find(change => change.field === 'totalPnl');
+      return pnlChange !== undefined;
+    });
+
+    // Compute the set of trade keys that actually require review (added, removed, modified with PnL changes)
     const reviewTradeKeys = [
       ...comparison.differences.trades.added.map(getTradeKey),
       ...comparison.differences.trades.removed.map(getTradeKey),
-      ...comparison.differences.trades.modified.map(({ trade }) => getTradeKey(trade)),
+      ...modifiedTradesWithPnlDiff.map(({ trade }) => getTradeKey(trade)),
     ];
     const reviewedCount = reviewTradeKeys.filter(key => markedTrades.has(key)).length;
     const totalTrades = reviewTradeKeys.length;
@@ -1021,25 +1027,61 @@ export function CompareTradingDialog({ isOpen, onClose, baseStats, compareStats,
           </div>
         )}
 
-        {comparison.differences.trades.modified.length > 0 && (
-          <div>
-            <div className="text-sm font-medium mb-2">Modified Trades</div>
-            <div className="space-y-2">
-              {comparison.differences.trades.modified
-                .sort((a, b) => {
-                  // Sort by timestamp without timezone conversion
-                  const timeA = a.trade.timestamp instanceof Date 
-                    ? a.trade.timestamp.getTime() 
-                    : parseISO(a.trade.timestamp).getTime();
-                  const timeB = b.trade.timestamp instanceof Date 
-                    ? b.trade.timestamp.getTime() 
-                    : parseISO(b.trade.timestamp).getTime();
-                  return timeA - timeB;
-                })
-                .map(({ trade, changes }) => renderTrade(trade, true, changes))}
-            </div>
-          </div>
-        )}
+        {(() => {
+          // Filter modified trades to only show those with PnL differences
+          const modifiedTradesWithPnlDiff = comparison.differences.trades.modified.filter(({ changes }) => {
+            // Check if there's a PnL change in the changes
+            const pnlChange = changes.find(change => change.field === 'totalPnl');
+            return pnlChange !== undefined;
+          });
+
+          if (modifiedTradesWithPnlDiff.length > 0) {
+            return (
+              <div>
+                <div className="text-sm font-medium mb-2">
+                  Modified Trades ({modifiedTradesWithPnlDiff.length})
+                </div>
+                <div className="space-y-2">
+                  {modifiedTradesWithPnlDiff
+                    .sort((a, b) => {
+                      // Sort by timestamp without timezone conversion
+                      const timeA = a.trade.timestamp instanceof Date 
+                        ? a.trade.timestamp.getTime() 
+                        : parseISO(a.trade.timestamp).getTime();
+                      const timeB = b.trade.timestamp instanceof Date 
+                        ? b.trade.timestamp.getTime() 
+                        : parseISO(b.trade.timestamp).getTime();
+                      return timeA - timeB;
+                    })
+                    .map(({ trade, changes }) => renderTrade(trade, true, changes))}
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
+
+        {/* Show count of modified trades without PnL differences */}
+        {(() => {
+          const modifiedTradesWithoutPnlDiff = comparison.differences.trades.modified.filter(({ changes }) => {
+            const pnlChange = changes.find(change => change.field === 'totalPnl');
+            return pnlChange === undefined;
+          }).length;
+
+          if (modifiedTradesWithoutPnlDiff > 0) {
+            return (
+              <div>
+                <div className="text-sm font-medium mb-2 text-muted-foreground">
+                  Modified Trades (Same PnL) ({modifiedTradesWithoutPnlDiff})
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    (Hidden - only showing trades with PnL differences)
+                  </span>
+                </div>
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {comparison.differences.trades.idOnlyChanged.length > 0 && (
           <div>
