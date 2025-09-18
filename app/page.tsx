@@ -37,14 +37,6 @@ const formatPercent = (value: number) => {
 }
 
 // Define types for the processed data
-interface TradeListEntry {
-  id: number;
-  timestamp: string;
-  totalPnl: number;
-  wins: number;
-  losses: number;
-}
-
 interface DashboardData {
   dailyLogs: DailyLog[];
   stats: TradingStats;

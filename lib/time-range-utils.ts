@@ -10,7 +10,7 @@ export function filterDailyLogsByTimeRange(dailyLogs: DailyLog[], timeRange: Tim
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   
   let startDate: Date
-  let endDate: Date = today
+  const endDate: Date = today
 
   switch (timeRange) {
     case 'wtd': {
